@@ -1,0 +1,3 @@
+tod/wrong					"sounds/bullet_met3_22.wav"
+tod/hit						"sounds/gun3_22.wav"
+tod/finishtyping			"sounds/item_22.wav"

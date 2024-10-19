@@ -1,0 +1,5 @@
+GameInfo
+{
+	AddEventHandlers = "TOD_Handler"
+	PlayerClasses = "TOD_Player"
+}

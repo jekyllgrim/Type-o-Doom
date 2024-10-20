@@ -9,14 +9,9 @@ class TOD_TextBox : Thinker
 	String stringToType;
 	String firstCharacter;
 	uint stringToTypeLength;
-	String typedString;
-	int currentPosition;
-	String displayCharacter;
-	uint displayCharacterTime;
 	uint turnTics;
 	double angleTurnStep;
 	double pitchTurnStep;
-	bool imperfect;
 
 	clearscope bool isActive()
 	{
@@ -50,12 +45,29 @@ class TOD_TextBox : Thinker
 		stringToType = listToUse[random[pickstr](0, listToUse.Size()-1)];
 		firstCharacter = stringToType.Left(1);
 		stringToTypeLength = stringToType.Length();
-		currentPosition = -1;
 		return true;
+	}
+
+	static TOD_TextBox Attach(PlayerPawn ppawn, Actor subject)
+	{
+		if (!ppawn || !ppawn.player || !ppawn.player.mo || ppawn.player.mo != ppawn || !subject || subject.health <= 0) return null;
+
+		let handler = TOD_Handler(EventHandler.Find('TOD_Handler'));
+		if (!handler) return null;
+
+		let msg = New('TOD_TextBox');
+		msg.handler = handler;
+		msg.ppawn = ppawn;
+		msg.playerNumber = ppawn.PlayerNumber();
+		msg.subject = subject;
+		handler.allTextBoxes.Push(msg);
+		return msg;
 	}
 
 	void Activate(bool setCurrent = false)
 	{
+		if (active) return;
+
 		if (!ppawn || !subject || subject.health <= 0 || !handler || !PickString())
 		{
 			Destroy();
@@ -73,67 +85,14 @@ class TOD_TextBox : Thinker
 			pitchTurnStep = -view.y / turnTics;
 		}
 
-		handler.allTextBoxes.Push(self);
 		handler.isUiProcessor = true;
 		if (setCurrent)
 		{
 			level.SetFrozen(true);
-			handler.currentTextBox = self;
 		}
 	}
 
-	static TOD_TextBox Attach(PlayerPawn ppawn, Actor subject)
-	{
-		if (!ppawn || !ppawn.player || !ppawn.player.mo || ppawn.player.mo != ppawn || !subject || subject.health <= 0) return null;
-
-		let handler = TOD_Handler(EventHandler.Find('TOD_Handler'));
-		if (!handler) return null;
-
-		let msg = New('TOD_TextBox');
-		msg.handler = handler;
-		msg.ppawn = ppawn;
-		msg.playerNumber = ppawn.PlayerNumber();
-		msg.subject = subject;
-		return msg;
-	}
-
-	bool AddCharacter(String chr)
-	{
-		if (!chr) return false;
-
-		currentPosition++;
-		String nextChar = stringToType.CharAt(currentPosition);
-		// skip spaces:
-		while (nextChar == " ")
-		{
-			currentPosition++;
-			typedString.AppendFormat(" ");
-			nextChar = stringToType.CharAt(currentPosition);
-		}
-		//Console.Printf("Expected character: \cy%s\c-. Trying character: \cd%s\c-", nextChar, chr);
-		if (chr ~== nextChar)
-		{
-			typedString.AppendFormat(nextChar);
-			S_StartSound("TOD/hit", CHAN_AUTO);
-			if (typedString == stringToType)
-			{
-				FinishTyping();
-			}
-			return true;
-		}
-		// spaces don't count but also don't produce the 'wrong' sound:
-		if (chr != " ")
-		{
-			S_StartSound("TOD/wrong", CHAN_AUTO);
-			displayCharacterTime = TICRATE;
-			displayCharacter = chr;
-			imperfect = true;
-		}
-		currentPosition--;
-		return false;
-	}
-
-	void FinishTyping()
+	void FinishTyping(bool imperfect = false)
 	{
 		level.SetFrozen(false);
 		if (subject && ppawn)
@@ -143,11 +102,6 @@ class TOD_TextBox : Thinker
 				'Normal',
 				DMG_FORCED|DMG_NO_FACTOR|DMG_NO_PROTECT|DMG_NO_ENHANCE);
 		}
-		let handler = TOD_Handler(EventHandler.Find('TOD_Handler'));
-		if (handler)
-		{
-			handler.isUiProcessor = false;
-		}
 		S_StartSound("TOD/finishtyping", CHAN_AUTO);
 		Destroy();
 	}
@@ -155,16 +109,8 @@ class TOD_TextBox : Thinker
 	override void Tick()
 	{
 		Super.Tick();
-		if (displayCharacterTime)
-		{
-			displayCharacterTime--;
-			if (displayCharacterTime == 0)
-			{
-				displayCharacter = "";
-			}
-		}
 
-		if (turnTics)
+		if (active && turnTics)
 		{
 			ppawn.A_SetAngle(ppawn.angle + angleTurnStep, SPF_INTERPOLATE);
 			ppawn.A_SetPitch(ppawn.pitch + pitchTurnStep, SPF_INTERPOLATE);

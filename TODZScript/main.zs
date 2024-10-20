@@ -102,32 +102,26 @@ class TOD_Handler : EventHandler
 {
 	array<TOD_TextBox> allTextBoxes;
 	TOD_TextBox currentTextBox;
-	//ui HUDFont typeFont;
+	TOD_Le_GlScreen projection;
+	TOD_Le_Viewport viewport;
+
 	ui Font typeFont;
-	protected TOD_Le_GlScreen gl_proj;
-	protected TOD_Le_Viewport viewport;
+	ui int currentPosition;
+	ui String typedString;
+	ui uint displayCharacterTime;
+	ui String displayCharacter;
+	ui bool imperfect;
 
 	override void OnRegister()
 	{
-		gl_proj = New("TOD_Le_GlScreen");
+		projection = New("TOD_Le_GlScreen");
 	}
 
 	override void NetworkProcess (ConsoleEvent e)
 	{
-		if (e.name.IndexOf("TOD_AddCharacter") >= 0)
-		{
-			if (!currentTextBox) return;
-			array<String> str;
-			e.name.Split(str, "||");
-			if (str.Size() != 2) return;
-			currentTextBox.AddCharacter(str[1]);
-		}
-
 		// test event that spawns a random monster:
 		if (!currentTextBox && e.name ~== "TOD_Test")
 		{
-			array<String> str;
-			e.name.Split(str, "||");
 			let ppawn = players[e.Player].mo;
 			Vector2 ofs = Actor.RotateVector((192, 0), ppawn.angle + frandom(-90, 90));
 			Vector3 spawnPos = ppawn.Vec3Offset(ofs.x, ofs.y, 0);
@@ -142,7 +136,101 @@ class TOD_Handler : EventHandler
 			}
 			else
 			{
-				stt.Activate(true);
+				FocusNewTextBox(stt);
+			}
+		}
+
+		if (e.name ~== "TOD_FinishTyping" && currentTextBox)
+		{
+			currentTextBox.FinishTyping(e.args[0]);
+			isUiProcessor = false;
+		}
+	}
+
+	override void InterfaceProcess(ConsoleEvent e)
+	{
+		if (e.name ~== "TOD_NewTextbox")
+		{
+			currentPosition = -1;
+			typedString = "";
+		}
+	}
+
+	override bool UiProcess(UiEvent e)
+	{
+		if (!currentTextBox) return false;
+
+		if (e.KeyChar == UiEvent.Key_ESCAPE) return false;
+
+		if (e.Type == UiEvent.Type_Char)
+		{
+			String chr = String.Format("%c", e.keyChar);
+			//Console.Printf("UiProcess captured character \cd%s\c-", chr);
+			AddCharacter(chr);
+			return true;
+		}
+
+		return false;
+	}
+
+	void FocusNewTextBox(TOD_TextBox textbox)
+	{
+		if (allTextBoxes.Find(textbox) == allTextBoxes.Size())
+		{
+			allTextBoxes.Push(textbox);
+		}
+
+		if (textbox == currentTextBox) return;
+
+		currentTextBox = textbox;
+		currentTextBox.Activate(true);
+		EventHandler.SendInterfaceEvent(textbox.playerNumber, "TOD_NewTextbox");
+	}
+
+	ui bool AddCharacter(String chr)
+	{
+		if (!chr) return false;
+
+		currentPosition++;
+		String nextChar = currentTextBox.stringToType.Mid(currentPosition, 1);
+		// skip spaces:
+		while (nextChar == " ")
+		{
+			currentPosition++;
+			typedString.AppendFormat(" ");
+			nextChar = currentTextBox.stringToType.Mid(currentPosition, 1);
+		}
+		Console.Printf("Expected character \cy%s\c- at pos \cd%d\c-. Trying character: \cd%s\c-", nextChar, currentPosition, chr);
+		if (chr ~== nextChar)
+		{
+			typedString.AppendFormat(nextChar);
+			S_StartSound("TOD/hit", CHAN_AUTO);
+			if (typedString == currentTextBox.stringToType)
+			{
+				EventHandler.SendNetworkEvent("TOD_FinishTyping", imperfect);
+			}
+			return true;
+		}
+		// spaces don't count but also don't produce the 'wrong' sound:
+		if (chr != " ")
+		{
+			S_StartSound("TOD/wrong", CHAN_AUTO);
+			displayCharacterTime = TICRATE;
+			displayCharacter = chr;
+			imperfect = true;
+		}
+		currentPosition--;
+		return false;
+	}
+
+	override void UiTick()
+	{
+		if (displayCharacterTime)
+		{
+			displayCharacterTime--;
+			if (displayCharacterTime == 0)
+			{
+				displayCharacter = "";
 			}
 		}
 	}
@@ -151,23 +239,23 @@ class TOD_Handler : EventHandler
 	{
 		if (!currentTextBox || !currentTextBox.isActive()) return;
 
-		if (!gl_proj) return;
+		if (!projection) return;
 	
 		let window_aspect = 1.0 * Screen.GetWidth() / Screen.GetHeight();
 		let resolution = 480 * (window_aspect, 1);
 		let t = e.fractic;
 		let mo = currentTextBox.subject;
 
-		gl_proj.CacheCustomResolution(resolution);
-		gl_proj.CacheFov(players[consoleplayer].fov);
-		gl_proj.OrientForRenderOverlay(e);
-		gl_proj.BeginProjection();
-		gl_proj.ProjectActorPosPortal(mo, (0, 0, mo.height*0.2), t);
+		projection.CacheCustomResolution(resolution);
+		projection.CacheFov(players[consoleplayer].fov);
+		projection.OrientForRenderOverlay(e);
+		projection.BeginProjection();
+		projection.ProjectActorPosPortal(mo, (0, 0, mo.height*0.2), t);
 
-		if (!gl_proj.IsInFront()) return;
+		if (!projection.IsInFront()) return;
 
 		viewport.FromHUD();
-		Vector2 pos = viewport.SceneToCustom(gl_proj.ProjectToNormal(), resolution);
+		Vector2 pos = viewport.SceneToCustom(projection.ProjectToNormal(), resolution);
 		if (!typeFont)
 		{
 			typeFont = Font.FindFont('NewConsoleFont');
@@ -203,13 +291,13 @@ class TOD_Handler : EventHandler
 			Font.CR_White,
 			pos.x,
 			pos.y,
-			currentTextBox.typedString,
+			typedString,
 			DTA_VirtualWidthF, resolution.x,
 			DTA_VirtualHeightF, resolution.y,
 			DTA_KeepRatio, true);
 
 		// Blinking text cursor:
-		pos.x += typeFont.StringWidth(currentTextBox.typedString);
+		pos.x += typeFont.StringWidth(typedString);
 		Screen.DrawText(typeFont,
 			Font.CR_White,
 			pos.x,
@@ -221,36 +309,19 @@ class TOD_Handler : EventHandler
 			DTA_Alpha, 0.5 + 0.5 * sin(360.0 * level.time / (TICRATE*0.5)));
 
 		// Wrong character typed (red, fading out and sliding down):
-		if (currentTextBox.displayCharacterTime)
+		if (displayCharacterTime)
 		{
-			pos.y += TOD_Utils.LinearMap(currentTextBox.displayCharacterTime, 1, TICRATE, 8, 0);
+			pos.y += TOD_Utils.LinearMap(displayCharacterTime, 1, TICRATE, 8, 0);
 			Screen.DrawText(typeFont,
 				Font.CR_Red,
 				pos.x,
 				pos.y,
-				currentTextBox.displayCharacter,
+				displayCharacter,
 				DTA_VirtualWidthF, resolution.x,
 				DTA_VirtualHeightF, resolution.y,
 				DTA_KeepRatio, true,
-				DTA_Alpha, currentTextBox.displayCharacterTime / double(TICRATE));
+				DTA_Alpha, displayCharacterTime / double(TICRATE));
 		}
-	}
-
-	override bool UiProcess(UiEvent e)
-	{
-		if (!currentTextBox) return false;
-
-		if (e.KeyChar == UiEvent.Key_ESCAPE) return false;
-
-		if (e.Type == UiEvent.Type_Char)
-		{
-			String chr = String.Format("%c", e.keyChar);
-			Console.Printf("UiProcess captured character \cd%s\c-", chr);
-			EventHandler.SendNetworkEvent(String.Format("TOD_AddCharacter||%s", chr));
-			return true;
-		}
-
-		return false;
 	}
 
 	// used for testing:

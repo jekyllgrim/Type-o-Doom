@@ -1,5 +1,5 @@
 GameInfo
 {
-	AddEventHandlers = "TOD_Handler"
+	AddEventHandlers = "TOD_Handler", "TOD_StaticInfo"
 	PlayerClasses = "TOD_Player"
 }

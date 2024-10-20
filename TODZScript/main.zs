@@ -69,8 +69,9 @@ class TOD_StaticInfo : StaticEventHandler
 		while (lump != -1)
 		{
 			String lumpdata = Wads.ReadLump(lump);
-			TOD_Utils.RemoveComments(lumpdata);
-			TOD_Utils.CleanWhiteSpace(lumpdata);
+			lumpdata = TOD_Utils.RemoveComments(lumpdata);
+			lumpdata = TOD_Utils.CleanWhiteSpace(lumpdata);
+			lumpdata = TOD_Utils.CleanQuotes(lumpdata);
 			int fileEnd = lumpdata.Length();
 			int searchpos = 0;
 			while (searchPos >= 0 && searchPos < fileEnd)
@@ -78,9 +79,9 @@ class TOD_StaticInfo : StaticEventHandler
 				int lineEnd = lumpdata.IndexOf("\n", searchPos);
 				if (lineEnd < 0)
 				{
-					lineEnd = fileEnd + 1; //add one if this is the end of file because we subtract one in the next line
+					lineEnd = fileEnd;
 				}
-				String textline = lumpdata.Mid(searchPos, lineEnd - searchPos - 1);
+				String textline = lumpdata.Mid(searchPos, lineEnd - searchPos);
 				if (!textline)
 				{
 					break;

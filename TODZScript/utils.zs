@@ -17,7 +17,7 @@ class TOD_Utils
 		return d;
 	}
 
-	static clearscope String RemoveComments(string stringToType)
+	static clearscope String RemoveComments(String stringToType)
 	{
 		int commentPos = stringToType.IndexOf("//");
 		while (commentpos >= 0)
@@ -35,8 +35,7 @@ class TOD_Utils
 		}
 		return stringToType;
 	}
-
-	static clearscope String CleanWhiteSpace(string workstring, bool removeSpaces = false)
+	static clearscope String CleanWhiteSpace(String workstring, bool removeSpaces = false)
 	{
 		// Strip tabs, carraige returns, "clearlocks",
 		// add linebreaks before "{" and "}":
@@ -66,4 +65,23 @@ class TOD_Utils
 		}
 		return workstring;
 	}
+
+	static clearscope String CleanQuotes(String workstring)
+	{
+		// single quotation marks:
+		workstring.Replace("’", "'");
+		workstring.Replace("‘", "'");
+		workstring.Replace("‚", "'");
+		workstring.Replace("‛", "'");
+
+		// double quotation marks:
+		workstring.Replace("“", "\"");
+		workstring.Replace("”", "\"");
+		workstring.Replace("„", "\"");
+		workstring.Replace("«", "\"");
+		workstring.Replace("»", "\"");
+
+		return workstring;
+	}
+
 }

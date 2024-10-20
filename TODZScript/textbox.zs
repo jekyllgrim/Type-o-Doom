@@ -1,10 +1,12 @@
 class TOD_TextBox : Thinker
 {
+	TOD_Handler handler;
 	PlayerPawn ppawn;
 	int playerNumber;
 	Actor subject;
 	bool active;
 	String stringToType;
+	String firstCharacter;
 	uint stringToTypeLength;
 	String typedString;
 	int currentPosition;
@@ -39,12 +41,35 @@ class TOD_TextBox : Thinker
 		}
 		
 		stringToType = listToUse[random[pickstr](0, listToUse.Size()-1)];
+		firstCharacter = stringToType.Left(1);
 		stringToTypeLength = stringToType.Length();
 		currentPosition = -1;
 		return true;
 	}
 
-	static TOD_TextBox Attach(PlayerPawn ppawn, Actor subject, bool setCurrent = false)
+	void Activate(bool setCurrent = false)
+	{
+		PickString();
+
+		Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
+		if (abs(view.x) > 45 || abs(view.y) > 15)
+		{
+			double maxViewDist = max(abs(view.x), abs(view.y));
+			turnTics = int(round(TOD_Utils.LinearMap(maxViewDist, 45, 180, TICRATE*0.5, TICRATE)));
+			angleTurnStep = -view.x / turnTics;
+			pitchTurnStep = -view.y / turnTics;
+		}
+
+		handler.allTextBoxes.Push(self);
+		handler.isUiProcessor = true;
+		if (setCurrent)
+		{
+			level.SetFrozen(true);
+			handler.currentTextBox = self;
+		}
+	}
+
+	static TOD_TextBox Attach(PlayerPawn ppawn, Actor subject)
 	{
 		if (!ppawn || !ppawn.player || !ppawn.player.mo || ppawn.player.mo != ppawn || !subject || subject.health <= 0) return null;
 
@@ -52,31 +77,10 @@ class TOD_TextBox : Thinker
 		if (!handler) return null;
 
 		let msg = New('TOD_TextBox');
+		msg.handler = handler;
 		msg.ppawn = ppawn;
 		msg.playerNumber = ppawn.PlayerNumber();
 		msg.subject = subject;
-		if (!msg.PickString())
-		{
-			msg.Destroy();
-			return null;
-		}
-
-		Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
-		if (abs(view.x) > 45 || abs(view.y) > 15)
-		{
-			double maxViewDist = max(abs(view.x), abs(view.y));
-			msg.turnTics = int(round(TOD_Utils.LinearMap(maxViewDist, 45, 180, TICRATE*0.5, TICRATE)));
-			msg.angleTurnStep = -view.x / msg.turnTics;
-			msg.pitchTurnStep = -view.y / msg.turnTics;
-		}
-
-		handler.allTextBoxes.Push(msg);
-		handler.isUiProcessor = true;
-		if (setCurrent)
-		{
-			level.SetFrozen(true);
-			handler.currentTextBox = msg;
-		}
 		return msg;
 	}
 
@@ -92,7 +96,7 @@ class TOD_TextBox : Thinker
 			typedString.AppendFormat(" ");
 			nextChar = stringToType.CharAt(currentPosition);
 		}
-		//Console.Printf("Expected character: \cy%s\c-. Trying character: \cd%s\c-", nextChar, chr);
+		Console.Printf("Expected character: \cy%s\c-. Trying character: \cd%s\c-", nextChar, chr);
 		if (chr ~== nextChar)
 		{
 			typedString.AppendFormat(nextChar);

@@ -135,10 +135,14 @@ class TOD_Handler : EventHandler
 			let victim = Actor.Spawn(victimClass, spawnPos);
 			victim.A_Face(ppawn);
 
-			let stt = TOD_TextBox.Attach(ppawn, victim, true);
+			let stt = TOD_TextBox.Attach(ppawn, victim);
 			if (!stt && victim)
 			{
 				victim.Destroy();
+			}
+			else
+			{
+				stt.Activate(true);
 			}
 		}
 	}

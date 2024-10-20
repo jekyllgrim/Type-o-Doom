@@ -103,12 +103,12 @@ class TOD_Handler : EventHandler
 	TOD_TextBox currentTextBox;
 	//ui HUDFont typeFont;
 	ui Font typeFont;
-	protected Le_GlScreen gl_proj;
-	protected Le_Viewport viewport;
+	protected TOD_Le_GlScreen gl_proj;
+	protected TOD_Le_Viewport viewport;
 
 	override void OnRegister()
 	{
-		gl_proj = New("Le_GlScreen");
+		gl_proj = New("TOD_Le_GlScreen");
 	}
 
 	override void NetworkProcess (ConsoleEvent e)

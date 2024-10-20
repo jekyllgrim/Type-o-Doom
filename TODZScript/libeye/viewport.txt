@@ -10,7 +10,7 @@
 	
 	*/
 
-struct Le_Viewport {
+struct TOD_Le_Viewport {
 	
 	private vector2					scene_origin;
 	private vector2					scene_size;

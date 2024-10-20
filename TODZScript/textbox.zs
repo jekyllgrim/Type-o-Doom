@@ -4,7 +4,8 @@ class TOD_TextBox : Thinker
 	PlayerPawn ppawn;
 	int playerNumber;
 	Actor subject;
-	bool active;
+	protected bool active;
+
 	String stringToType;
 	String firstCharacter;
 	uint stringToTypeLength;
@@ -15,6 +16,12 @@ class TOD_TextBox : Thinker
 	uint turnTics;
 	double angleTurnStep;
 	double pitchTurnStep;
+	bool imperfect;
+
+	clearscope bool isActive()
+	{
+		return active;
+	}
 
 	bool PickString()
 	{
@@ -49,7 +56,13 @@ class TOD_TextBox : Thinker
 
 	void Activate(bool setCurrent = false)
 	{
-		PickString();
+		if (!ppawn || !subject || subject.health <= 0 || !handler || !PickString())
+		{
+			Destroy();
+			return;
+		}
+
+		active = true;
 
 		Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
 		if (abs(view.x) > 45 || abs(view.y) > 15)
@@ -90,13 +103,14 @@ class TOD_TextBox : Thinker
 
 		currentPosition++;
 		String nextChar = stringToType.CharAt(currentPosition);
+		// skip spaces:
 		while (nextChar == " ")
 		{
 			currentPosition++;
 			typedString.AppendFormat(" ");
 			nextChar = stringToType.CharAt(currentPosition);
 		}
-		Console.Printf("Expected character: \cy%s\c-. Trying character: \cd%s\c-", nextChar, chr);
+		//Console.Printf("Expected character: \cy%s\c-. Trying character: \cd%s\c-", nextChar, chr);
 		if (chr ~== nextChar)
 		{
 			typedString.AppendFormat(nextChar);
@@ -107,11 +121,13 @@ class TOD_TextBox : Thinker
 			}
 			return true;
 		}
+		// spaces don't count but also don't produce the 'wrong' sound:
 		if (chr != " ")
 		{
 			S_StartSound("TOD/wrong", CHAN_AUTO);
 			displayCharacterTime = TICRATE;
 			displayCharacter = chr;
+			imperfect = true;
 		}
 		currentPosition--;
 		return false;
@@ -122,7 +138,10 @@ class TOD_TextBox : Thinker
 		level.SetFrozen(false);
 		if (subject && ppawn)
 		{
-			subject.DamageMobj(ppawn, ppawn, subject.health, 'Normal', DMG_FORCED|DMG_NO_PROTECT|DMG_NO_ENHANCE);
+			subject.DamageMobj(ppawn, ppawn,
+				imperfect? subject.health : subject.health *  2,
+				'Normal',
+				DMG_FORCED|DMG_NO_FACTOR|DMG_NO_PROTECT|DMG_NO_ENHANCE);
 		}
 		let handler = TOD_Handler(EventHandler.Find('TOD_Handler'));
 		if (handler)

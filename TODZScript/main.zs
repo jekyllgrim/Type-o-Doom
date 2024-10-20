@@ -149,7 +149,7 @@ class TOD_Handler : EventHandler
 
 	override void RenderOverlay(RenderEvent e)
 	{
-		if (!currentTextBox) return;
+		if (!currentTextBox || !currentTextBox.isActive()) return;
 
 		if (!gl_proj) return;
 	

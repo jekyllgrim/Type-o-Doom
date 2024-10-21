@@ -136,7 +136,7 @@ class TOD_Handler : EventHandler
 			}
 			else
 			{
-				FocusNewTextBox(stt);
+				stt.Activate();
 			}
 		}
 
@@ -173,20 +173,6 @@ class TOD_Handler : EventHandler
 		return false;
 	}
 
-	void FocusNewTextBox(TOD_TextBox textbox)
-	{
-		if (allTextBoxes.Find(textbox) == allTextBoxes.Size())
-		{
-			allTextBoxes.Push(textbox);
-		}
-
-		if (textbox == currentTextBox) return;
-
-		currentTextBox = textbox;
-		currentTextBox.Activate(true);
-		EventHandler.SendInterfaceEvent(textbox.playerNumber, "TOD_NewTextbox");
-	}
-
 	ui bool AddCharacter(String chr)
 	{
 		if (!chr) return false;
@@ -200,7 +186,7 @@ class TOD_Handler : EventHandler
 			typedString.AppendFormat(" ");
 			nextChar = currentTextBox.stringToType.Mid(currentPosition, 1);
 		}
-		Console.Printf("Expected character \cy%s\c- at pos \cd%d\c-. Trying character: \cd%s\c-", nextChar, currentPosition, chr);
+		//Console.Printf("Expected character \cy%s\c- at pos \cd%d\c-. Trying character: \cd%s\c-", nextChar, currentPosition, chr);
 		if (chr ~== nextChar)
 		{
 			typedString.AppendFormat(nextChar);
@@ -271,8 +257,15 @@ class TOD_Handler : EventHandler
 		// Why doesn't Screen.Dim have DTA flags? Well, we need to scale it to
 		// our virtual resolution too (handleaspect is false because we've
 		// already handled it above):
-		let [dimPos, dimSize] = Screen.VirtualToRealCoords(pos, size, resolution, handleaspect:false);
-		Screen.Dim(0x000000, 0.85, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
+		Vector2 border = (3, 3);
+		let [dimPos, dimSize] = Screen.VirtualToRealCoords(pos - border, size + border*2, resolution, handleaspect:false);
+		int colR = int(round(TOD_Utils.LinearMap(currentTextBox.typeTics, 0, currentTextBox.startTypeTime, 255, 128)));
+		int colG = int(round(TOD_Utils.LinearMap(currentTextBox.typeTics, 0, currentTextBox.startTypeTime, 0, 255)));
+		double pulseFreq = TOD_Utils.LinearMap(currentTextBox.typeTics, 0, currentTextBox.startTypeTime, TICRATE*0.25, TICRATE*2);
+		double amt = 0.75 + 0.25 * sin(360.0 * level.time / pulseFreq);
+		Screen.Dim(color(255, colG, 0), amt, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
+		[dimPos, dimSize] = Screen.VirtualToRealCoords(pos, size, resolution, handleaspect:false);
+		Screen.Dim(0x000000, 1.0, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
 		
 		// String to type (top):
 		pos += (indent, 10);
@@ -321,6 +314,14 @@ class TOD_Handler : EventHandler
 				DTA_VirtualHeightF, resolution.y,
 				DTA_KeepRatio, true,
 				DTA_Alpha, displayCharacterTime / double(TICRATE));
+		}
+	}
+
+	override void WorldThingSpawned(WorldEvent e)
+	{
+		if (e.thing.bIsMonster && !e.thing.bFriendly && e.thing.bShootable)
+		{
+			TOD_TextBox.Attach(players[0].mo, e.thing);
 		}
 	}
 

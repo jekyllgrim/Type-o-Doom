@@ -4,6 +4,7 @@ class TOD_TextBox : Thinker
 	PlayerPawn ppawn;
 	int playerNumber;
 	Actor subject;
+	State subjectAttackState;
 	protected bool active;
 
 	String stringToType;
@@ -13,9 +14,33 @@ class TOD_TextBox : Thinker
 	double angleTurnStep;
 	double pitchTurnStep;
 
+	int typeTics;
+	uint startTypeTime;
+
+	const AVGTYPEPERTIC = 3.5 / TICRATE;
+	const REACTIONTICS = TICRATE * 3;
+
 	clearscope bool isActive()
 	{
 		return active;
+	}
+
+	int GetStateSeqDuration(State atkst)
+	{
+		int tics;
+		State st = atkst;
+		array<State> cachedStates;
+		while (st && Actor.InStateSequence(st, atkst))
+		{
+			tics += st.tics;
+			cachedStates.Push(st);
+			if (!st.nextstate || st.nextstate == st || cachedStates.Find(st.nextstate) != cachedStates.Size())
+			{
+				break;
+			}
+			st = st.nextstate;
+		}
+		return tics;
 	}
 
 	bool PickString()
@@ -45,6 +70,8 @@ class TOD_TextBox : Thinker
 		stringToType = listToUse[random[pickstr](0, listToUse.Size()-1)];
 		firstCharacter = stringToType.Left(1);
 		stringToTypeLength = stringToType.Length();
+		startTypeTime = int(ceil(stringToTypeLength * AVGTYPEPERTIC)) + REACTIONTICS;
+		typeTics = startTypeTime;
 		return true;
 	}
 
@@ -64,7 +91,7 @@ class TOD_TextBox : Thinker
 		return msg;
 	}
 
-	void Activate(bool setCurrent = false)
+	void Activate(bool setCurrent = true)
 	{
 		if (active) return;
 
@@ -85,10 +112,17 @@ class TOD_TextBox : Thinker
 			pitchTurnStep = -view.y / turnTics;
 		}
 
-		handler.isUiProcessor = true;
 		if (setCurrent)
 		{
 			level.SetFrozen(true);
+			ppawn.A_Stop();
+			handler.isUiProcessor = true;
+			if (handler.allTextBoxes.Find(self) == handler.allTextBoxes.Size())
+			{
+				handler.allTextBoxes.Push(self);
+			}
+			handler.currentTextBox = self;
+			EventHandler.SendInterfaceEvent(playerNumber, "TOD_NewTextbox");
 		}
 	}
 
@@ -108,13 +142,47 @@ class TOD_TextBox : Thinker
 
 	override void Tick()
 	{
-		Super.Tick();
+		if (!ppawn || !subject || subject.health <= 0)
+		{
+			Destroy();
+			return;
+		}
 
 		if (active && turnTics)
 		{
 			ppawn.A_SetAngle(ppawn.angle + angleTurnStep, SPF_INTERPOLATE);
 			ppawn.A_SetPitch(ppawn.pitch + pitchTurnStep, SPF_INTERPOLATE);
 			turnTics--;
+		}
+
+		if (!active && (Actor.InStateSequence(subject.curstate, subject.FindState("Missile")) || Actor.InStateSequence(subject.curstate, subject.FindState("Melee"))))
+		{
+			Activate();
+			subjectAttackState = subject.curstate;
+		}
+
+		if (active)
+		{
+			if (typeTics > 0)
+			{
+				typeTics--;
+				if (typeTics == 0)
+				{
+					subject.bNoTimeFreeze = true;
+					subject.speed = 0;
+					typeTics = GetStateSeqDuration(subject.curstate) * -1;
+				}
+			}
+			else if (typeTics < 0)
+			{
+				typeTics++;
+				if (typeTics == 0)
+				{
+					subject.bNoTimeFreeze = false;
+					typeTics = int(round(startTypeTime * 0.7));
+					subject.SetState(subjectAttackState);
+				}
+			}
 		}
 	}
 }

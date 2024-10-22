@@ -6,6 +6,7 @@ version "4.13.0"
 #include "TODZScript/libeye/viewport.txt"
 
 #include "TODZScript/utils.zs"
+#include "TODZScript/glossaryhandler.zs"
 #include "TODZScript/main.zs"
 #include "TODZScript/textbox.zs"
 #include "TODZScript/player.zs"

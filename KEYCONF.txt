@@ -1,0 +1,4 @@
+alias "startTyping" "netevent TOD_StartTyping"
+alias "stopTyping" "netevent TOD_StopTyping"
+alias "toggleTyping" "netevent TOD_ToggleTyping"
+defaultbind Enter toggleTyping

@@ -17,24 +17,25 @@ class TOD_Utils
 		return d;
 	}
 
-	static clearscope String RemoveComments(String stringToType)
+	static clearscope String RemoveComments(String workstring)
 	{
-		int commentPos = stringToType.IndexOf("//");
+		int commentPos = workstring.IndexOf("//");
 		while (commentpos >= 0)
 		{
-			int lineEnd = stringToType.IndexOf("\n", commentPos) - 1;
-			stringToType.Remove(commentPos, lineEnd - commentPos);
-			commentPos = stringToType.IndexOf("//");
+			int lineEnd = workstring.IndexOf("\n", commentPos) - 1;
+			workstring.Remove(commentPos, lineEnd - commentPos);
+			commentPos = workstring.IndexOf("//");
 		}
-		commentPos = stringToType.IndexOf("/*");
+		commentPos = workstring.IndexOf("/*");
 		while (commentpos >= 0)
 		{
-			int lineEnd = stringToType.IndexOf("*/", commentPos) - 1;
-			stringToType.Remove(commentPos, lineEnd - commentPos);
-			commentPos = stringToType.IndexOf("/*");
+			int lineEnd = workstring.IndexOf("*/", commentPos) - 1;
+			workstring.Remove(commentPos, lineEnd - commentPos);
+			commentPos = workstring.IndexOf("/*");
 		}
-		return stringToType;
+		return workstring;
 	}
+
 	static clearscope String CleanWhiteSpace(String workstring, bool removeSpaces = false)
 	{
 		// Strip tabs, carraige returns, "clearlocks",
@@ -68,11 +69,12 @@ class TOD_Utils
 
 	static clearscope String CleanQuotes(String workstring)
 	{
-		// single quotation marks:
+		// single quotation marks / apostrophes:
 		workstring.Replace("’", "'");
 		workstring.Replace("‘", "'");
 		workstring.Replace("‚", "'");
 		workstring.Replace("‛", "'");
+		workstring.Replace("`", "'");
 
 		// double quotation marks:
 		workstring.Replace("“", "\"");
@@ -84,4 +86,12 @@ class TOD_Utils
 		return workstring;
 	}
 
+	static clearscope String CleanDashes(String workstring)
+	{
+		workstring.Replace("—", "-"); //em dash
+		workstring.Replace("–", "-"); //en dash
+		workstring.Replace("--", "-"); //double hyphen
+
+		return workstring;
+	}
 }

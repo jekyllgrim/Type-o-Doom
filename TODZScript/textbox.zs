@@ -45,6 +45,8 @@ class TOD_TextBox : Thinker
 
 	bool PickString()
 	{
+		if (stringToType) return true;
+
 		array<String> listToUse;
 		let handler = TOD_StaticInfo(StaticEventHandler.Find('TOD_StaticInfo'));
 		if (!handler) return false;
@@ -87,14 +89,13 @@ class TOD_TextBox : Thinker
 		msg.ppawn = ppawn;
 		msg.playerNumber = ppawn.PlayerNumber();
 		msg.subject = subject;
+		msg.PickString();
 		handler.allTextBoxes.Push(msg);
 		return msg;
 	}
 
-	void Activate(bool setCurrent = true)
+	void Activate(bool setCurrent = false)
 	{
-		if (active) return;
-
 		if (!ppawn || !subject || subject.health <= 0 || !handler || !PickString())
 		{
 			Destroy();
@@ -103,32 +104,50 @@ class TOD_TextBox : Thinker
 
 		active = true;
 
-		Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
-		if (abs(view.x) > 45 || abs(view.y) > 15)
+		if (handler.activeTextBoxes.Find(self) == handler.activeTextBoxes.Size())
 		{
-			double maxViewDist = max(abs(view.x), abs(view.y));
-			turnTics = int(round(TOD_Utils.LinearMap(maxViewDist, 45, 180, TICRATE*0.5, TICRATE)));
-			angleTurnStep = -view.x / turnTics;
-			pitchTurnStep = -view.y / turnTics;
+			handler.activeTextBoxes.Push(self);
 		}
 
 		if (setCurrent)
 		{
 			level.SetFrozen(true);
 			ppawn.A_Stop();
+			Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
+			if (abs(view.x) > 45 || abs(view.y) > 15)
+			{
+				double maxViewDist = max(abs(view.x), abs(view.y));
+				turnTics = int(round(TOD_Utils.LinearMap(maxViewDist, 45, 180, TICRATE*0.5, TICRATE)));
+				angleTurnStep = -view.x / turnTics;
+				pitchTurnStep = -view.y / turnTics;
+			}
 			handler.isUiProcessor = true;
 			if (handler.allTextBoxes.Find(self) == handler.allTextBoxes.Size())
 			{
 				handler.allTextBoxes.Push(self);
 			}
-			handler.currentTextBox = self;
 			EventHandler.SendInterfaceEvent(playerNumber, "TOD_NewTextbox");
+		}
+	}
+
+	void Deactivate()
+	{
+		active = false;
+		angleTurnStep = 0;
+		pitchTurnStep = 0;
+		if (subject && subject.health > 0)
+		{
+			subject.bNoTimeFreeze = false;
+		}
+		int id = handler.activeTextBoxes.Find(self);
+		if (id < handler.activeTextBoxes.Size())
+		{
+			handler.activeTextBoxes.Delete(id);
 		}
 	}
 
 	void FinishTyping(bool imperfect = false)
 	{
-		level.SetFrozen(false);
 		if (subject && ppawn)
 		{
 			subject.DamageMobj(ppawn, ppawn,
@@ -140,6 +159,19 @@ class TOD_TextBox : Thinker
 		Destroy();
 	}
 
+	bool IsVisible()
+	{
+		if (subject.Distance3DSquared(ppawn) >= 2048**2) return false;
+
+		Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
+		if (abs(view.x) > ppawn.player.fov || abs(view.y) > 45)
+		{
+			return false;
+		}
+
+		return ppawn.CheckSight(subject, SF_IGNOREWATERBOUNDARY);
+	}
+
 	override void Tick()
 	{
 		if (!ppawn || !subject || subject.health <= 0)
@@ -148,7 +180,22 @@ class TOD_TextBox : Thinker
 			return;
 		}
 
-		if (active && turnTics)
+		if (level.time % 4 == 0)
+		{
+			int id = handler.activeTextBoxes.Find(self);
+			int size = handler.activeTextBoxes.Size();
+			bool inArray = (id != size);
+			if (inArray && !IsVisible())
+			{
+				handler.activeTextBoxes.Delete(id);
+			}
+			else if (!inArray && IsVisible())
+			{
+				handler.activeTextBoxes.Push(self);
+			}
+		}
+
+		/*if (active && turnTics)
 		{
 			ppawn.A_SetAngle(ppawn.angle + angleTurnStep, SPF_INTERPOLATE);
 			ppawn.A_SetPitch(ppawn.pitch + pitchTurnStep, SPF_INTERPOLATE);
@@ -161,9 +208,22 @@ class TOD_TextBox : Thinker
 			subjectAttackState = subject.curstate;
 		}
 
-		if (active)
+		ProgressSubjectStates();*/
+	}
+
+	void ProgressSubjectStates()
+	{
+		if (!active) return;
+
+		if (typeTics > 0)
 		{
-			if (typeTics > 0)
+			int freq = int(TOD_Utils.LinearMap(handler.activeTextBoxes.Size(), 1, 50, 1, 10));
+			/*if (handler.currentTextBox != self)
+			{
+				freq *= 2;
+			}*/
+			//Console.Printf("freq: \cd%d\c- | level.time mod freq: \cd%d\c-", freq, (level.time % freq));
+			if (level.time % freq == 0)
 			{
 				typeTics--;
 				if (typeTics == 0)
@@ -173,16 +233,31 @@ class TOD_TextBox : Thinker
 					typeTics = GetStateSeqDuration(subject.curstate) * -1;
 				}
 			}
-			else if (typeTics < 0)
+		}
+		else if (typeTics < 0)
+		{
+			typeTics++;
+			if (typeTics == 0)
 			{
-				typeTics++;
-				if (typeTics == 0)
-				{
-					subject.bNoTimeFreeze = false;
-					typeTics = int(round(startTypeTime * 0.7));
-					subject.SetState(subjectAttackState);
-				}
+				subject.bNoTimeFreeze = false;
+				typeTics = int(round(startTypeTime * 0.7));
+				subject.SetState(subjectAttackState);
 			}
 		}
+	}
+
+	override void OnDestroy()
+	{
+		Deactivate();
+		int id = handler.allTextBoxes.Find(self);
+		if (id != handler.allTextBoxes.Size())
+		{
+			handler.allTextBoxes.Delete(id);
+		}
+		if (subject && subject.health > 0)
+		{
+			subject.DamageMobj(ppawn, ppawn, subject.health, 'Normal');
+		}
+		Super.OnDestroy();
 	}
 }

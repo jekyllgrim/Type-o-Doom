@@ -1,114 +1,17 @@
-class TOD_StaticInfo : StaticEventHandler
-{
-	array<String> words_1short;
-	array<String> words_1word;
-	array<String> words_2words;
-	array<String> words_3words;
-	array<String> words_4words;
-	array<String> words_sentences;
-
-	override void OnRegister()
-	{
-		ParseGlossary("TODG_sh", words_1short);
-		ParseGlossary("TODG_1w", words_1word);
-		ParseGlossary("TODG_2w", words_2words);
-		ParseGlossary("TODG_3w", words_3words);
-		ParseGlossary("TODG_4w", words_4words);
-		ParseGlossary("TODG_sen", words_sentences);
-
-		/*String info = String.Format("Short words (\cy%d\c-): ", words_1short.Size());
-		foreach (str : words_1short)
-		{
-			info.AppendFormat("\cd%s\c-,", str);
-		}
-		Console.Printf(info);
-
-		info = String.Format("Words (\cy%d\c-): ", words_1word.Size());
-		foreach (str : words_1word)
-		{
-			info.AppendFormat("\cd%s\c-,", str);
-		}
-		Console.Printf(info);
-
-		info = String.Format("2-word groups (\cy%d\c-): ", words_2words.Size());
-		foreach (str : words_2words)
-		{
-			info.AppendFormat("\cd%s\c-,", str);
-		}
-		Console.Printf(info);
-		
-		info = String.Format("3-word groups (\cy%d\c-): ", words_3words.Size());
-		foreach (str : words_3words)
-		{
-			info.AppendFormat("\cd%s\c-,", str);
-		}
-		Console.Printf(info);
-		
-		info = String.Format("4-word groups (\cy%d\c-): ", words_4words.Size());
-		foreach (str : words_4words)
-		{
-			info.AppendFormat("\cd%s\c-,", str);
-		}
-		Console.Printf(info);
-		
-		info = String.Format("Sentences (\cy%d\c-): ", words_sentences.Size());
-		foreach (str : words_sentences)
-		{
-			info.AppendFormat("\cd%s\c-,", str);
-		}
-		Console.Printf(info);*/
-	}
-
-	void ParseGlossary(String glossaryName, out array<String> stringList)
-	{
-		int lump = Wads.FindLump(glossaryName, 0);
-		if (lump < 0)
-		{
-			Console.Printf("\cgTOD error: glossary \cd%s\cg not found", glossaryName);
-		}
-		while (lump != -1)
-		{
-			String lumpdata = Wads.ReadLump(lump);
-			lumpdata = TOD_Utils.RemoveComments(lumpdata);
-			lumpdata = TOD_Utils.CleanWhiteSpace(lumpdata);
-			lumpdata = TOD_Utils.CleanQuotes(lumpdata);
-			int fileEnd = lumpdata.Length();
-			int searchpos = 0;
-			while (searchPos >= 0 && searchPos < fileEnd)
-			{
-				int lineEnd = lumpdata.IndexOf("\n", searchPos);
-				if (lineEnd < 0)
-				{
-					lineEnd = fileEnd;
-				}
-				String textline = lumpdata.Mid(searchPos, lineEnd - searchPos);
-				if (!textline)
-				{
-					break;
-				}
-				stringList.Push(textline);
-				searchPos = lineEnd + 1;
-			}
-			lump = Wads.FindLump(glossaryName, lump + 1);
-		}
-		if (stringList.Size() == 0)
-		{
-			Console.Printf("\cgTOD error: No words parsed from glossary \cd%s", glossaryName);
-		}
-	}
-}
-
 class TOD_Handler : EventHandler
 {
 	array<TOD_TextBox> allTextBoxes;
-	TOD_TextBox currentTextBox;
+	array<TOD_TextBox> activeTextBoxes;
 	TOD_Le_GlScreen projection;
 	TOD_Le_Viewport viewport;
 
+	bool isPlayerTyping;
+
+	ui TOD_TextBox currentTextBox;
 	ui Font typeFont;
 	ui int currentPosition;
 	ui String typedString;
-	ui uint displayCharacterTime;
+	ui uint displayCharacterTics;
 	ui String displayCharacter;
 	ui bool imperfect;
 
@@ -117,10 +20,25 @@ class TOD_Handler : EventHandler
 		projection = New("TOD_Le_GlScreen");
 	}
 
+	override bool InputProcess (InputEvent e)
+	{
+		if (e.type == InputEvent.Type_KeyDown && !isPlayerTyping)
+		{
+			String bind = bindings.GetBinding(e.KeyScan);
+			if (bind ~== "+attack" || bind ~== "+altattack")
+			{
+				EventHandler.SendNetworkEvent("TOD_StartTyping");
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	override void NetworkProcess (ConsoleEvent e)
 	{
 		// test event that spawns a random monster:
-		if (!currentTextBox && e.name ~== "TOD_Test")
+		if (e.name ~== "TOD_Test")
 		{
 			let ppawn = players[e.Player].mo;
 			Vector2 ofs = Actor.RotateVector((192, 0), ppawn.angle + frandom(-90, 90));
@@ -134,37 +52,52 @@ class TOD_Handler : EventHandler
 			{
 				victim.Destroy();
 			}
-			else
+		}
+
+		if (e.name ~== "TOD_FinishTyping")
+		{
+			int id = e.args[0];
+			let tbox = activeTextBoxes[id];
+			if (tbox)
 			{
-				stt.Activate();
+				activeTextBoxes.Delete(id);
+				tbox.FinishTyping(e.args[1]);
+			}
+			if (activeTextBoxes.Size() <= 0)
+			{
+				ToggleTyping(false);
 			}
 		}
-
-		if (e.name ~== "TOD_FinishTyping" && currentTextBox)
+		if (e.name ~== "TOD_StartTyping")
 		{
-			currentTextBox.FinishTyping(e.args[0]);
-			isUiProcessor = false;
+			ToggleTyping(true);
 		}
-	}
-
-	override void InterfaceProcess(ConsoleEvent e)
-	{
-		if (e.name ~== "TOD_NewTextbox")
+		if (e.name ~== "TOD_StopTyping")
 		{
-			currentPosition = -1;
-			typedString = "";
+			ToggleTyping(false);
+		}
+		if (e.name ~== "TOD_ToggleTyping")
+		{
+			ToggleTyping(!isPlayerTyping);
 		}
 	}
 
 	override bool UiProcess(UiEvent e)
 	{
-		if (!currentTextBox) return false;
+		if (e.type == UiEvent.Type_KeyDown)
+		{
+			if (e.KeyChar == UiEvent.Key_ESCAPE)
+			{
+				Menu.SetMenu("MainMenu");
+				return false;
+			}
 
-		if (e.KeyChar == UiEvent.Key_ESCAPE) return false;
+		}
 
 		if (e.Type == UiEvent.Type_Char)
 		{
 			String chr = String.Format("%c", e.keyChar);
+			if (!chr) return false;
 			//Console.Printf("UiProcess captured character \cd%s\c-", chr);
 			AddCharacter(chr);
 			return true;
@@ -173,9 +106,46 @@ class TOD_Handler : EventHandler
 		return false;
 	}
 
+	void ToggleTyping(bool enable)
+	{
+		if (!enable || activeTextBoxes.Size() <= 0)
+		{
+			isPlayerTyping = false;
+			isUiProcessor = false;
+			level.SetFrozen(false);
+			return;
+		}
+
+		isPlayerTyping = true;
+		isUiProcessor = true;
+		players[0].mo.A_Stop();
+		level.SetFrozen(true);
+	}
+
 	ui bool AddCharacter(String chr)
 	{
 		if (!chr) return false;
+
+		chr = TOD_Utils.CleanQuotes(chr);
+		chr = TOD_Utils.CleanDashes(chr);
+
+		if (!currentTextBox)
+		{
+			foreach (tbox : activeTextBoxes)
+			{
+				if (tbox && tbox.firstCharacter ~== chr)
+				{
+					currentTextBox = tbox;
+					currentPosition = -1;
+					typedString = "";
+					break;
+				}
+			}
+		}
+		if (!currentTextBox)
+		{
+			return false;
+		}
 
 		currentPosition++;
 		String nextChar = currentTextBox.stringToType.Mid(currentPosition, 1);
@@ -193,7 +163,8 @@ class TOD_Handler : EventHandler
 			S_StartSound("TOD/hit", CHAN_AUTO);
 			if (typedString == currentTextBox.stringToType)
 			{
-				EventHandler.SendNetworkEvent("TOD_FinishTyping", imperfect);
+				EventHandler.SendNetworkEvent("TOD_FinishTyping", activeTextBoxes.Find(currentTextBox), imperfect);
+				currentTextBox = null;
 			}
 			return true;
 		}
@@ -201,7 +172,7 @@ class TOD_Handler : EventHandler
 		if (chr != " ")
 		{
 			S_StartSound("TOD/wrong", CHAN_AUTO);
-			displayCharacterTime = TICRATE;
+			displayCharacterTics = TICRATE;
 			displayCharacter = chr;
 			imperfect = true;
 		}
@@ -211,109 +182,132 @@ class TOD_Handler : EventHandler
 
 	override void UiTick()
 	{
-		if (displayCharacterTime)
+		if (displayCharacterTics)
 		{
-			displayCharacterTime--;
-			if (displayCharacterTime == 0)
+			displayCharacterTics--;
+			if (displayCharacterTics == 0)
 			{
 				displayCharacter = "";
 			}
 		}
 	}
 
+	override void WorldLoaded(WorldEvent e)
+	{
+		ToggleTyping(false);
+	}
+
 	override void RenderOverlay(RenderEvent e)
 	{
-		if (!currentTextBox || !currentTextBox.isActive()) return;
+		if (activeTextBoxes.Size() <= 0) return;
 
 		if (!projection) return;
 	
 		let window_aspect = 1.0 * Screen.GetWidth() / Screen.GetHeight();
 		let resolution = 480 * (window_aspect, 1);
 		let t = e.fractic;
-		let mo = currentTextBox.subject;
 
 		projection.CacheCustomResolution(resolution);
 		projection.CacheFov(players[consoleplayer].fov);
 		projection.OrientForRenderOverlay(e);
 		projection.BeginProjection();
-		projection.ProjectActorPosPortal(mo, (0, 0, mo.height*0.2), t);
 
-		if (!projection.IsInFront()) return;
-
-		viewport.FromHUD();
-		Vector2 pos = viewport.SceneToCustom(projection.ProjectToNormal(), resolution);
-		if (!typeFont)
+		foreach (tbox : activeTextBoxes)
 		{
-			typeFont = Font.FindFont('NewConsoleFont');
-		}
+			let mo = tbox.subject;
+			if (!mo) return;
+			projection.ProjectActorPosPortal(mo, (0, 0, mo.height*0.5), t);
 
-		// Size of the box and indentation:
-		Vector2 size = (280, 64);
-		double indent = 8;
-		// Change size and position based on current string width:
-		size.x = typeFont.StringWidth(currentTextBox.stringToType) + indent*2;
-		pos += size * -0.5;
+			if (!projection.IsInFront()) return;
 
-		// Why doesn't Screen.Dim have DTA flags? Well, we need to scale it to
-		// our virtual resolution too (handleaspect is false because we've
-		// already handled it above):
-		Vector2 border = (3, 3);
-		let [dimPos, dimSize] = Screen.VirtualToRealCoords(pos - border, size + border*2, resolution, handleaspect:false);
-		int colR = int(round(TOD_Utils.LinearMap(currentTextBox.typeTics, 0, currentTextBox.startTypeTime, 255, 128)));
-		int colG = int(round(TOD_Utils.LinearMap(currentTextBox.typeTics, 0, currentTextBox.startTypeTime, 0, 255)));
-		double pulseFreq = TOD_Utils.LinearMap(currentTextBox.typeTics, 0, currentTextBox.startTypeTime, TICRATE*0.25, TICRATE*2);
-		double amt = 0.75 + 0.25 * sin(360.0 * level.time / pulseFreq);
-		Screen.Dim(color(255, colG, 0), amt, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
-		[dimPos, dimSize] = Screen.VirtualToRealCoords(pos, size, resolution, handleaspect:false);
-		Screen.Dim(0x000000, 1.0, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
-		
-		// String to type (top):
-		pos += (indent, 10);
-		Screen.DrawText(typeFont,
-			Font.CR_Yellow,
-			pos.x,
-			pos.y,
-			currentTextBox.stringToType,
-			DTA_VirtualWidthF, resolution.x,
-			DTA_VirtualHeightF, resolution.y,
-			DTA_KeepRatio, true);
+			viewport.FromHUD();
+			Vector2 pos = viewport.SceneToCustom(projection.ProjectToNormal(), resolution);
+			if (!typeFont)
+			{
+				typeFont = Font.FindFont('NewConsoleFont');
+			}
 
-		// String typed so far (below):
-		pos.y += 32;
-		Screen.DrawText(typeFont,
-			Font.CR_White,
-			pos.x,
-			pos.y,
-			typedString,
-			DTA_VirtualWidthF, resolution.x,
-			DTA_VirtualHeightF, resolution.y,
-			DTA_KeepRatio, true);
+			// Size of the box and indentation:
+			Vector2 size = (280, 64);
+			double indent = 8;
+			// Change size and position based on current string width:
+			size.x = typeFont.StringWidth(tbox.stringToType) + indent*2;
+			pos.x -= size.x*0.5;
 
-		// Blinking text cursor:
-		pos.x += typeFont.StringWidth(typedString);
-		Screen.DrawText(typeFont,
-			Font.CR_White,
-			pos.x,
-			pos.y,
-			"_",
-			DTA_VirtualWidthF, resolution.x,
-			DTA_VirtualHeightF, resolution.y,
-			DTA_KeepRatio, true,
-			DTA_Alpha, 0.5 + 0.5 * sin(360.0 * level.time / (TICRATE*0.5)));
+			bool isCurrent = tbox == currentTextBox;
 
-		// Wrong character typed (red, fading out and sliding down):
-		if (displayCharacterTime)
-		{
-			pos.y += TOD_Utils.LinearMap(displayCharacterTime, 1, TICRATE, 8, 0);
+			// Screen.Dim doesn't have DTA flags, so we need VirtualToRealCoords
+			// handleaspect is false because we've already handled it above
+
+			// border
+			Vector2 border = (3, 3);
+			let [dimPos, dimSize] = Screen.VirtualToRealCoords(pos - border, size + border*2, resolution, handleaspect:false);
+			double alpha = 1.0;
+			if (!isCurrent) alpha *= 0.75;
+			Screen.Dim(0xCCFF60, alpha, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
+
+			double pulseFreq = TOD_Utils.LinearMap(tbox.typeTics, 0, tbox.startTypeTime, TICRATE*0.25, TICRATE*2);
+			double amt = 0.5 + 0.5 * sin(360.0 * level.time / pulseFreq);
+			alpha *= TOD_Utils.LinearMap(tbox.typeTics, 0, tbox.startTypeTime, 1.0, 0.0);
+			if (!isCurrent) alpha *= 0.75;
+			Screen.Dim(0xFF0000, alpha, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
+
+			// inner black area
+			[dimPos, dimSize] = Screen.VirtualToRealCoords(pos, size, resolution, handleaspect:false);
+			color col = isCurrent? 0x000030 : 0x101010;
+			Screen.Dim(col, 1.0, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
+			
+			// String to type (top):
+			pos += (indent, 10);
 			Screen.DrawText(typeFont,
-				Font.CR_Red,
+				Font.CR_Yellow,
 				pos.x,
 				pos.y,
-				displayCharacter,
+				tbox.stringToType,
 				DTA_VirtualWidthF, resolution.x,
 				DTA_VirtualHeightF, resolution.y,
-				DTA_KeepRatio, true,
-				DTA_Alpha, displayCharacterTime / double(TICRATE));
+				DTA_KeepRatio, true);
+
+			if (isCurrent)
+			{
+				// String typed so far (below):
+				pos.y += 32;
+				Screen.DrawText(typeFont,
+					Font.CR_White,
+					pos.x,
+					pos.y,
+					typedString,
+					DTA_VirtualWidthF, resolution.x,
+					DTA_VirtualHeightF, resolution.y,
+					DTA_KeepRatio, true);
+
+				// Blinking text cursor:
+				pos.x += typeFont.StringWidth(typedString);
+				Screen.DrawText(typeFont,
+					Font.CR_White,
+					pos.x,
+					pos.y,
+					"_",
+					DTA_VirtualWidthF, resolution.x,
+					DTA_VirtualHeightF, resolution.y,
+					DTA_KeepRatio, true,
+					DTA_Alpha, 0.5 + 0.5 * sin(360.0 * level.time / (TICRATE*0.5)));
+
+				// Wrong character typed (red, fading out and sliding down):
+				if (displayCharacterTics)
+				{
+					pos.y += TOD_Utils.LinearMap(displayCharacterTics, 1, TICRATE, 8, 0);
+					Screen.DrawText(typeFont,
+						Font.CR_Red,
+						pos.x,
+						pos.y,
+						displayCharacter,
+						DTA_VirtualWidthF, resolution.x,
+						DTA_VirtualHeightF, resolution.y,
+						DTA_KeepRatio, true,
+						DTA_Alpha, displayCharacterTics / double(TICRATE));
+				}
+			}
 		}
 	}
 

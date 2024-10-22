@@ -1,3 +1,22 @@
-tod/wrong					"sounds/bullet_met3_22.wav"
-tod/hit						"sounds/gun3_22.wav"
-tod/finishtyping			"sounds/item_22.wav"
+tod/wrong	"sounds/bullet_met3_22.wav"
+tod/hit		"sounds/gun3_22.wav"
+
+$random tod/finishtyping
+{
+	tod/blood1
+	tod/blood2
+	tod/blood3
+	tod/blood4
+	tod/blood5
+	tod/blood6
+	tod/blood7
+}
+tod/blood1	"sounds/blood01.wav"
+tod/blood2	"sounds/blood02.wav"
+tod/blood3	"sounds/blood03.wav"
+tod/blood4	"sounds/blood04.wav"
+tod/blood5	"sounds/blood05.wav"
+tod/blood6	"sounds/blood06.wav"
+tod/blood7	"sounds/blood07.wav"
+
+tod/item	"sounds/item_22.wav"

@@ -111,6 +111,7 @@ class TOD_Handler : EventHandler
 	{
 		if (e.name ~== "TOD_FocusTextbox")
 		{
+			typedstring = "";
 			currentTextBox = activeTextBoxes[e.args[0]];
 		}
 	}
@@ -174,6 +175,7 @@ class TOD_Handler : EventHandler
 				if (activeTextBoxes[i] && activeTextBoxes[i].firstCharacter ~== chr)
 				{
 					currentTextBox = activeTextBoxes[i];
+					typedstring = "";
 					break;
 				}
 			}
@@ -412,12 +414,12 @@ class TOD_Handler : EventHandler
 				DTA_Alpha, alpha);
 		}
 
-		if (typeDelayTics)
+		/*if (typeDelayTics)
 		{
-			double alpha = 0.5 + -0.5 * sin(360.0 * typeDelayTics / (TYPEDELAY));
+			double alpha = double(typeDelayTics) / TYPEDELAY;
 			Screen.Dim(0xffffff, alpha, pos1.x, pos1.y, size.x, size.y);
 			Screen.Dim(0xffffff, alpha, pos2.x, pos2.y, size.x, size.y);
-		}
+		}*/
 	}
 
 	override void RenderOverlay(RenderEvent e)
@@ -462,6 +464,21 @@ class TOD_Handler : EventHandler
 		if (e.thing.bIsMonster && !e.thing.bFriendly && e.thing.bShootable)
 		{
 			TOD_TextBox.Attach(players[0].mo, e.thing);
+		}
+
+		if (e.thing.bMissile && e.thing.target && e.thing.target.bIsMonster && !e.thing.target.bFriendly)
+		{
+			TOD_ProjectileTextBox.Attach(players[0].mo, e.thing);
+		}
+
+		if (e.thing is 'Blood' || e.thing.bIsPuff)
+		{
+			e.thing.bNoTimeFreeze = true;
+		}
+
+		if (e.thing is 'Health')
+		{
+			e.thing.Destroy();
 		}
 	}
 

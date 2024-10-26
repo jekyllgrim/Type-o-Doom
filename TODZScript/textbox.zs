@@ -1,10 +1,15 @@
 class TOD_TextBox : Thinker
 {
+	protected int age;
+	protected TOD_Le_GlScreen projection;
+
 	TOD_Handler handler;
 	PlayerPawn ppawn;
 	int playerNumber;
 	Actor subject;
-	State subjectAttackState;
+	State subjectCachedState;
+	State sMelee;
+	State sMissile;
 	protected bool active;
 
 	String stringToType;
@@ -17,7 +22,7 @@ class TOD_TextBox : Thinker
 	int typeTics;
 	uint startTypeTime;
 
-	const AVGTYPEPERTIC = 3.5 / TICRATE;
+	const AVGTYPEPERTIC = 4.0 / TICRATE;
 	const REACTIONTICS = TICRATE * 3;
 
 	clearscope bool isActive()
@@ -45,32 +50,51 @@ class TOD_TextBox : Thinker
 
 	bool PickString()
 	{
-		if (stringToType) return true;
+		if (stringToType && handler.activeTextBoxes.Find(self) < handler.activeTextBoxes.Size()) return true;
 
 		array<String> listToUse;
-		let handler = TOD_StaticInfo(StaticEventHandler.Find('TOD_StaticInfo'));
-		if (!handler) return false;
+		let glossary = TOD_StaticInfo(StaticEventHandler.Find('TOD_StaticInfo'));
+		if (!glossary) return false;
 
 		if (subject.health <= 80)
-			listToUse.Copy(handler.words_1short);
+			listToUse.Copy(glossary.words_1short);
 		else if (subject.health <= 200)
-			listToUse.Copy(handler.words_1word);
+			listToUse.Copy(glossary.words_1word);
 		else if (subject.health <= 300)
-			listToUse.Copy(handler.words_2words);
+			listToUse.Copy(glossary.words_2words);
 		else if (subject.health <= 500)
-			listToUse.Copy(handler.words_3words);
+			listToUse.Copy(glossary.words_3words);
 		else if (subject.health <= 1000)
-			listToUse.Copy(handler.words_4words);
+			listToUse.Copy(glossary.words_4words);
 		else
-			listToUse.Copy(handler.words_sentences);
+			listToUse.Copy(glossary.words_sentences);
 		
 		if (listToUse.Size() < 1)
 		{
 			return false;
 		}
-		
-		stringToType = listToUse[random[pickstr](0, listToUse.Size()-1)];
-		firstCharacter = stringToType.Left(1);
+
+		int maxiterations = listToUse.Size();
+		while (maxiterations)
+		{
+			stringToType = listToUse[random[pickstr](0, listToUse.Size()-1)];
+			firstCharacter = stringToType.Left(1);
+			bool isValid = true;
+			foreach (tbox : handler.activeTextBoxes)
+			{
+				if (tbox && tbox.firstCharacter ~== firstCharacter)
+				{
+					isValid = false;
+					break;
+				}
+			}
+			if (isValid)
+			{
+				break;
+			}
+			maxiterations--;
+		}
+
 		stringToTypeLength = stringToType.Length();
 		startTypeTime = int(ceil(stringToTypeLength * AVGTYPEPERTIC)) + REACTIONTICS;
 		typeTics = startTypeTime;
@@ -88,13 +112,18 @@ class TOD_TextBox : Thinker
 		msg.handler = handler;
 		msg.ppawn = ppawn;
 		msg.playerNumber = ppawn.PlayerNumber();
+		subject.bNoTimeFreeze = true;
+		subject.bNoInfighting = true;
+		subject.reactiontime = 1;
 		msg.subject = subject;
+		msg.sMelee = subject.FindState("Melee");
+		msg.sMissile = subject.FindState("Missile");
 		msg.PickString();
 		handler.allTextBoxes.Push(msg);
 		return msg;
 	}
 
-	void Activate(bool setCurrent = false)
+	void Activate()
 	{
 		if (!ppawn || !subject || subject.health <= 0 || !handler || !PickString())
 		{
@@ -108,26 +137,6 @@ class TOD_TextBox : Thinker
 		{
 			handler.activeTextBoxes.Push(self);
 		}
-
-		if (setCurrent)
-		{
-			level.SetFrozen(true);
-			ppawn.A_Stop();
-			Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
-			if (abs(view.x) > 45 || abs(view.y) > 15)
-			{
-				double maxViewDist = max(abs(view.x), abs(view.y));
-				turnTics = int(round(TOD_Utils.LinearMap(maxViewDist, 45, 180, TICRATE*0.5, TICRATE)));
-				angleTurnStep = -view.x / turnTics;
-				pitchTurnStep = -view.y / turnTics;
-			}
-			handler.isUiProcessor = true;
-			if (handler.allTextBoxes.Find(self) == handler.allTextBoxes.Size())
-			{
-				handler.allTextBoxes.Push(self);
-			}
-			EventHandler.SendInterfaceEvent(playerNumber, "TOD_NewTextbox");
-		}
 	}
 
 	void Deactivate()
@@ -135,14 +144,19 @@ class TOD_TextBox : Thinker
 		active = false;
 		angleTurnStep = 0;
 		pitchTurnStep = 0;
-		if (subject && subject.health > 0)
+		typeTics = startTypeTime;
+		if (subject)
 		{
-			subject.bNoTimeFreeze = false;
+			subject.bNoTimeFreeze = (subject.health <= 0 || !IsAttacking());
 		}
 		int id = handler.activeTextBoxes.Find(self);
 		if (id < handler.activeTextBoxes.Size())
 		{
 			handler.activeTextBoxes.Delete(id);
+		}
+		if (handler.activeTextBoxes.Size() <= 0)
+		{
+			level.SetFrozen(false);
 		}
 	}
 
@@ -155,16 +169,28 @@ class TOD_TextBox : Thinker
 				'Normal',
 				DMG_FORCED|DMG_NO_FACTOR|DMG_NO_PROTECT|DMG_NO_ENHANCE);
 		}
-		S_StartSound("TOD/finishtyping", CHAN_AUTO);
 		Destroy();
 	}
 
 	bool IsVisible()
 	{
-		if (subject.Distance3DSquared(ppawn) >= 2048**2) return false;
+		if (ppawn.Distance3DSquared(subject) > 2048**2)
+		{
+			return false;
+		}
 
-		Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
-		if (abs(view.x) > ppawn.player.fov || abs(view.y) > 45)
+		if (!projection)
+		{
+			projection = New("TOD_Le_GlScreen");
+		}
+
+		projection.CacheCustomResolution(480 * (Screen.GetAspectRatio(), 1));
+		projection.CacheFov(ppawn.player.fov);
+		projection.OrientForPlayer(ppawn.player);
+		projection.BeginProjection();
+		projection.ProjectActorPosPortal(subject, (0, 0, subject.height*0.5));
+
+		if (!projection.IsInScreen())
 		{
 			return false;
 		}
@@ -180,56 +206,99 @@ class TOD_TextBox : Thinker
 			return;
 		}
 
-		if (level.time % 4 == 0)
+		age++;
+		if (age % 8 == 0 || (!turntics && !active))
 		{
-			int id = handler.activeTextBoxes.Find(self);
-			int size = handler.activeTextBoxes.Size();
-			bool inArray = (id != size);
-			if (inArray && !IsVisible())
+			if (active && !IsVisible())
 			{
-				handler.activeTextBoxes.Delete(id);
+				Deactivate();
 			}
-			else if (!inArray && IsVisible())
+			else if (!active && IsVisible())
 			{
-				handler.activeTextBoxes.Push(self);
+				Activate();
 			}
 		}
 
-		/*if (active && turnTics)
-		{
-			ppawn.A_SetAngle(ppawn.angle + angleTurnStep, SPF_INTERPOLATE);
-			ppawn.A_SetPitch(ppawn.pitch + pitchTurnStep, SPF_INTERPOLATE);
-			turnTics--;
-		}
-
-		if (!active && (Actor.InStateSequence(subject.curstate, subject.FindState("Missile")) || Actor.InStateSequence(subject.curstate, subject.FindState("Melee"))))
+		if (!handler.isPlayerTyping && (Actor.InStateSequence(subject.curstate, sMelee) || Actor.InStateSequence(subject.curstate, sMissile)))
 		{
 			Activate();
-			subjectAttackState = subject.curstate;
+			//EventHandler.SendInterfaceEvent(playerNumber, "TOD_FocusTextBox", id);
+			handler.ToggleTyping(true);
+			Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
+			if (abs(view.x) > 45 || abs(view.y) > 15)
+			{
+				double maxViewDist = max(abs(view.x), abs(view.y));
+				turnTics = int(round(TOD_Utils.LinearMap(maxViewDist, 45, 180, TICRATE*0.5, TICRATE)));
+				angleTurnStep = -view.x / turnTics;
+				pitchTurnStep = -view.y / turnTics;
+			}
 		}
 
-		ProgressSubjectStates();*/
+		if (handler.isPlayerTyping)
+		{
+			if (active)
+			{
+				if (turnTics)
+				{
+					ppawn.A_SetAngle(ppawn.angle + angleTurnStep, SPF_INTERPOLATE);
+					ppawn.A_SetPitch(ppawn.pitch + pitchTurnStep, SPF_INTERPOLATE);
+					turnTics--;
+				}
+				else
+				{
+					ProgressSubjectStates();
+				}
+			}
+			else
+			{
+				subject.bNoTimeFreeze = !IsAttacking();
+			}
+		}
+	}
+
+	bool IsAttacking()
+	{
+		if (!sMelee)
+			sMelee = subject.FindState("Melee");
+		if (!sMissile)
+			sMissile = subject.FindState("Missile");
+
+		if ((sMelee && subjectCachedState == sMelee) || (sMissile && subjectCachedState == sMissile))
+		{
+			return true;
+		}
+
+		if ((sMelee && Actor.InStateSequence(subject.curstate, sMelee) && subjectCachedState != sMelee) ||
+		    (sMissile && Actor.InStateSequence(subject.curstate, sMissile) && subjectCachedState != sMissile))
+		{
+			subjectCachedState = sMelee? sMelee : sMissile;
+			return true;
+		}
+		
+		return false;
 	}
 
 	void ProgressSubjectStates()
 	{
-		if (!active) return;
+		if (!IsAttacking())
+		{
+			subject.bNoTimeFreeze = true;
+			return;
+		}
+		else if (typeTics == startTypeTime)
+		{
+			subject.bNoTimeFreeze = false;
+		}
 
 		if (typeTics > 0)
 		{
-			int freq = int(TOD_Utils.LinearMap(handler.activeTextBoxes.Size(), 1, 50, 1, 10));
-			/*if (handler.currentTextBox != self)
-			{
-				freq *= 2;
-			}*/
-			//Console.Printf("freq: \cd%d\c- | level.time mod freq: \cd%d\c-", freq, (level.time % freq));
+			int freq = clamp(handler.activeTextBoxes.Size() / 2, 1, TICRATE);
 			if (level.time % freq == 0)
 			{
 				typeTics--;
 				if (typeTics == 0)
 				{
 					subject.bNoTimeFreeze = true;
-					subject.speed = 0;
 					typeTics = GetStateSeqDuration(subject.curstate) * -1;
 				}
 			}
@@ -241,7 +310,10 @@ class TOD_TextBox : Thinker
 			{
 				subject.bNoTimeFreeze = false;
 				typeTics = int(round(startTypeTime * 0.7));
-				subject.SetState(subjectAttackState);
+				if ((sMelee && subjectCachedState == sMelee) || (sMissile && subjectCachedState == sMissile))
+				{
+					subject.SetState(subjectCachedState);
+				}
 			}
 		}
 	}
@@ -254,9 +326,11 @@ class TOD_TextBox : Thinker
 		{
 			handler.allTextBoxes.Delete(id);
 		}
-		if (subject && subject.health > 0)
+		if (subject)
 		{
-			subject.DamageMobj(ppawn, ppawn, subject.health, 'Normal');
+			subject.bNoTimeFreeze = true;
+			if (subject.health > 0)
+				subject.DamageMobj(ppawn, ppawn, subject.health, 'Normal');
 		}
 		Super.OnDestroy();
 	}

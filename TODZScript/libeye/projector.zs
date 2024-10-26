@@ -70,10 +70,10 @@ class TOD_Le_ProjScreen {
 	
 	void OrientForPlayer (PlayerInfo player) {
 		Reorient(
-			player.mo.vec3offset(0, 0, player.viewheight), (
-			player.mo.angle,
-			player.mo.pitch,
-			player.mo.roll));
+			(player.mo.pos.xy, player.viewz), (
+			player.mo.angle + player.mo.viewangle,
+			player.mo.pitch + player.mo.viewpitch,
+			player.mo.roll + player.mo.viewroll));
 	}
 	
 	virtual void Reorient (vector3 world_view_pos, vector3 world_ang) {

@@ -1,9 +1,9 @@
 version "4.13.0"
 
-#include "TODZScript/libeye/projector.txt"
-#include "TODZScript/libeye/projector gl.txt"
-#include "TODZScript/libeye/projector planar.txt"
-#include "TODZScript/libeye/viewport.txt"
+#include "TODZScript/libeye/projector.zs"
+#include "TODZScript/libeye/projector gl.zs"
+#include "TODZScript/libeye/projector planar.zs"
+#include "TODZScript/libeye/viewport.zs"
 
 #include "TODZScript/utils.zs"
 #include "TODZScript/glossaryhandler.zs"

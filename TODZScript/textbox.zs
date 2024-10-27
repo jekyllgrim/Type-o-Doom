@@ -120,6 +120,7 @@ class TOD_TextBox : Thinker
 		subject.bNoInfighting = true;
 		subject.reactiontime = 1;
 		subject.speed *= 0.5;
+		subject.maxTargetRange = TOD_MAXTYPINGRANGE;
 		msg.subject = subject;
 		msg.sMelee = subject.FindState("Melee");
 		msg.sMissile = subject.FindState("Missile");
@@ -192,7 +193,7 @@ class TOD_TextBox : Thinker
 			return true;
 		}
 
-		if (ppawn.Distance3DSquared(subject) > 2048**2)
+		if (ppawn.Distance3DSquared(subject) > TOD_MAXTYPINGRANGE**2)
 		{
 			return false;
 		}
@@ -283,6 +284,11 @@ class TOD_TextBox : Thinker
 		{
 			Destroy();
 			return;
+		}
+
+		if (subject.target && subject.Distance3DSquared(subject.target) > TOD_MAXTYPINGRANGE**2)
+		{
+			subject.A_ClearTarget();
 		}
 
 		UpdateVisibility();

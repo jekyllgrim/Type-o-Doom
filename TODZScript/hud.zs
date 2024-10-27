@@ -33,6 +33,11 @@ class TOD_Hud : BaseStatusBar
 	bool displayStar;
 	array<TOD_PerfectStar> stars;
 
+	uint showCrackTics;
+	const SHOWCRACKTIME = TICRATE * 2;
+	TextureID crackTexture;
+	Vector2 crackPos;
+
 	override void Init()
 	{
 		Super.Init();
@@ -56,6 +61,7 @@ class TOD_Hud : BaseStatusBar
 			BeginHUD(1.0, true, 320, 200);
 			DrawPerfectionIndicator();
 			DrawHealth();
+			DrawCrack();
 		}
 	}
 
@@ -107,12 +113,22 @@ class TOD_Hud : BaseStatusBar
 				stars.Push(star);
 			}
 		}
+
+		if (showCrackTics > 0)
+		{
+			showCrackTics--;
+		}
 	}
 
 	void PlayerDamaged()
 	{
 		justLostHealth = true;
 		healthTexFrameLost = HEALTHTEX_LOOPFRAME;
+
+		showCrackTics = SHOWCRACKTIME;
+		crackTexture = TexMan.CheckForTexture("TODHOLE"..random[uicrack](1,4));
+		Vector2 virtualRes = 200.0 * (Screen.GetAspectRatio(), 1);
+		crackPos = (frandom[uicrack](32, virtualRes.x - 32), frandom[uicrack](32, virtualRes.y - 32));
 	}
 
 	void DrawHealth()
@@ -181,6 +197,18 @@ class TOD_Hud : BaseStatusBar
 				}
 			}
 		}
+	}
+
+	void DrawCrack()
+	{
+		if (!showCrackTics || !crackTexture.IsValid()) return;
+
+		double alpha = 1.0;
+		if (showCrackTics < SHOWCRACKTIME*0.5)
+		{
+			alpha = (level.time & 8)? 0.25 : 1.0;
+		}
+		DrawTexture(crackTexture, crackPos, DI_ITEM_CENTER, scale: (0.4, 0.4), alpha: alpha);
 	}
 }
 

@@ -568,12 +568,12 @@ class TOD_Handler : EventHandler
 			TOD_TextBox.Attach(players[0].mo, e.thing);
 		}
 
-		if (e.thing.bMissile && e.thing.target && e.thing.target.bIsMonster && !e.thing.target.bFriendly)
+		if (e.thing.bMissile && (!e.thing.target || (e.thing.target.bIsMonster && !e.thing.target.bFriendly)))
 		{
 			TOD_ProjectileTextBox.Attach(players[0].mo, e.thing);
 		}
 
-		if (e.thing is 'Blood' || e.thing.bIsPuff)
+		if (e.thing is 'Blood' || e.thing.bIsPuff || e.thing is 'BulletPuff')
 		{
 			e.thing.bNoTimeFreeze = true;
 		}

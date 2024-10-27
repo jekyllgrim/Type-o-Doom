@@ -11,3 +11,5 @@ version "4.13.0"
 #include "TODZScript/hud.zs"
 #include "TODZScript/textbox.zs"
 #include "TODZScript/player.zs"
+
+const TOD_MAXTYPINGRANGE = 800;

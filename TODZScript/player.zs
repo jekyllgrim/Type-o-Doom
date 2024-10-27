@@ -1,5 +1,7 @@
 class TOD_Player : DoomPlayer
 {
+	uint damageTics;
+
 	Default
 	{
 		Health 10;
@@ -13,6 +15,11 @@ class TOD_Player : DoomPlayer
 
 	override int DamageMobj (Actor inflictor, Actor source, int damage, Name mod, int flags, double angle)
 	{
+		if (damageTics)
+		{
+			return 0;
+		}
+
 		if (flags & DMG_EXPLOSION)
 		{
 			return 0;
@@ -32,7 +39,17 @@ class TOD_Player : DoomPlayer
 		if (damage > 0)
 		{
 			EventHandler.SendInterfaceEvent(PlayerNumber(), "TOD_PlayerDamaged");
+			damageTics = 1;
 		}
 		return Super.DamageMobj(inflictor, source, min(damage, 1), mod, flags, angle);
+	}
+
+	override void Tick()
+	{
+		Super.Tick();
+		if (damageTics && player && player.mo && player.mo == self)
+		{
+			damageTics = 0;
+		}
 	}
 }

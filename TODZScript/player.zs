@@ -24,11 +24,15 @@ class TOD_Player : DoomPlayer
 			return 0;
 		}
 
-		if (abs(DeltaAngle(angle, AngleTo(dmgsource))) > player.fov*0.5)
+		/*if (AbsAngle(angle, AngleTo(dmgsource)) > player.fov*0.5)
 		{
 			return 0;
+		}*/
+	
+		if (damage > 0)
+		{
+			EventHandler.SendInterfaceEvent(PlayerNumber(), "TOD_PlayerDamaged");
 		}
-		
 		return Super.DamageMobj(inflictor, source, min(damage, 1), mod, flags, angle);
 	}
 }

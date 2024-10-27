@@ -79,6 +79,10 @@ class TOD_TextBox : Thinker
 		{
 			stringToType = listToUse[random[pickstr](0, listToUse.Size()-1)];
 			firstCharacter = stringToType.Left(1);
+			if (handler.activeTextBoxes.Size() <= 1)
+			{
+				break;
+			}
 			bool isValid = true;
 			foreach (tbox : handler.activeTextBoxes)
 			{
@@ -170,6 +174,14 @@ class TOD_TextBox : Thinker
 				'Normal',
 				DMG_FORCED|DMG_NO_FACTOR|DMG_NO_PROTECT|DMG_NO_ENHANCE);
 		}
+		if (!imperfect)
+		{
+			handler.IncrementPerfectCounter();
+		}
+		else
+		{
+			handler.ResetPerfectCounter();
+		}
 		Destroy();
 	}
 
@@ -194,7 +206,7 @@ class TOD_TextBox : Thinker
 		projection.CacheFov(ppawn.player.fov);
 		projection.OrientForPlayer(ppawn.player);
 		projection.BeginProjection();
-		projection.ProjectActorPosPortal(subject, (0, 0, 0));
+		projection.ProjectActorPosPortal(subject, (0, 0, subject.height*0.5));
 
 		if (!projection.IsInScreen())
 		{

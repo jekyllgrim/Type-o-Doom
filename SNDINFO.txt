@@ -1,5 +1,6 @@
-tod/wrong	"sounds/bullet_met3_22.wav"
-tod/hit		"sounds/gun3_22.wav"
+tod/wrong		"sounds/bullet_met3_22.wav"
+tod/hit			"sounds/gun3_22.wav"
+tod/perfect		"sounds/money_22.wav"
 
 $random tod/finishtyping
 {

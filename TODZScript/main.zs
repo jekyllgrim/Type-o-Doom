@@ -8,6 +8,13 @@ class TOD_Handler : EventHandler
 	bool isPlayerTyping;
 	int typeDelayTics;
 	const TYPEDELAY = TICRATE / 2;
+	uint perfectWords;
+	uint perfectLevels;
+	enum EPerfection
+	{
+		PERFECT_WordsPerLevel = 10,
+		PERFECT_LevelsForLife = 5,
+	}
 
 	ui TOD_TextBox currentTextBox;
 	ui Font typeFont;
@@ -21,6 +28,8 @@ class TOD_Handler : EventHandler
 	ui int headerStringMax;
 	const HEADERTEXT = "Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive!";
 	ui int headerTextWidth;
+	ui Shape2D textBoxMarker;
+	ui Shape2DTransform markerTransform;
 
 	override void OnRegister()
 	{
@@ -105,6 +114,11 @@ class TOD_Handler : EventHandler
 				}
 			}
 		}
+
+		if (e.name ~== "TOD_WrongCharacter")
+		{
+			ResetPerfectCounter();
+		}
 	}
 
 	override void InterfaceProcess (ConsoleEvent e)
@@ -113,6 +127,24 @@ class TOD_Handler : EventHandler
 		{
 			typedstring = "";
 			currentTextBox = activeTextBoxes[e.args[0]];
+		}
+
+		if (e.name ~== "TOD_PlayerDamaged")
+		{
+			let hud = TOD_Hud(statusbar);
+			if (hud)
+			{
+				hud.PlayerDamaged();
+			}
+		}
+
+		if (e.name ~== "TOD_PerfectLevelComplete")
+		{
+			let hud = TOD_Hud(statusbar);
+			if (hud)
+			{
+				hud.PerfectLevelComplete();
+			}
 		}
 	}
 
@@ -161,6 +193,27 @@ class TOD_Handler : EventHandler
 		}
 	}
 
+	void IncrementPerfectCounter()
+	{
+		if (++perfectWords >= PERFECT_WordsPerLevel)
+		{
+			perfectWords = 0;
+			perfectLevels++;
+			S_StartSound("tod/perfect", CHAN_AUTO);
+			if (perfectLevels % PERFECT_LevelsForLife == 0)
+			{
+				players[0].mo.GiveBody(1);
+			}
+			EventHandler.SendInterfaceEvent(0, "TOD_PerfectLevelComplete");
+		}
+	}
+
+	void ResetPerfectCounter()
+	{
+		perfectWords = 0;
+		perfectLevels = 0;
+	}
+
 	ui bool TypeCharacter(String chr)
 	{
 		if (!chr) return false;
@@ -182,11 +235,15 @@ class TOD_Handler : EventHandler
 		}
 		if (!currentTextBox)
 		{
+			S_StartSound("TOD/wrong", CHAN_AUTO);
+			//EventHandler.SendNetworkEvent("TOD_WrongCharacter");
+			//imperfect = true;
 			return false;
 		}
 		if (!typedString)
 		{
 			currentPosition = -1;
+			imperfect = false;
 		}
 
 		currentPosition++;
@@ -213,9 +270,10 @@ class TOD_Handler : EventHandler
 			}
 			return true;
 		}
-		// spaces don't count but also don't produce the 'wrong' sound:
+		// spaces don't count as either right or wrong:
 		if (chr != " ")
 		{
+			EventHandler.SendNetworkEvent("TOD_WrongCharacter");
 			S_StartSound("TOD/wrong", CHAN_AUTO);
 			displayCharacterTics = TICRATE;
 			displayCharacter = chr;
@@ -254,11 +312,6 @@ class TOD_Handler : EventHandler
 		}
 
 		//Console.MidPrint(smallfont, String.Format("active textboxes: \cd%d\c-", activeTextBoxes.Size()));
-	}
-
-	override void WorldLoaded(WorldEvent e)
-	{
-		ToggleTyping(false);
 	}
 
 	ui void DrawTextBox(TOD_TextBox tbox, Vector2 resolution, double ticFrac, bool isCurrent = false)
@@ -306,7 +359,7 @@ class TOD_Handler : EventHandler
 		}*/
 		border = (3, 3);
 		[dimPos, dimSize] = Screen.VirtualToRealCoords(pos - border, size + border*2, resolution, handleaspect:false);
-		Screen.Dim(0xCCFF60, 1.0, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
+		Screen.Dim(0x80AA60, 1.0, dimPos.x, dimPos.y, dimSize.x, dimSize.y);
 
 		double pulseFreq = TOD_Utils.LinearMap(tbox.typeTics, 0, tbox.startTypeTime, TICRATE*0.25, TICRATE*2);
 		double alpha = 0.5 + 0.5 * sin(360.0 * level.time / pulseFreq);
@@ -368,6 +421,50 @@ class TOD_Handler : EventHandler
 					DTA_KeepRatio, true,
 					DTA_Alpha, displayCharacterTics / double(TICRATE));
 			}
+
+			if (!textBoxMarker)
+			{
+				textBoxMarker = new('Shape2D');
+				markerTransform = new('Shape2DTransform');
+				textBoxMarker.PushVertex((0.15, 0.15));
+				textBoxMarker.PushVertex((-0.5, -0.1));
+				textBoxMarker.PushVertex((-0.2, -0.2));
+				textBoxMarker.PushVertex((-0.1, -0.5));
+				for (int i = 0; i < 4; i++)
+				{
+					textBoxMarker.PushCoord((0,0));
+				}
+				textBoxMarker.PushTriangle(0,1,2);
+				textBoxMarker.PushTriangle(0, 1, 2);
+				textBoxMarker.PushTriangle(2, 3, 0);
+			}
+
+			let markerPos = dimPos;
+			let markerArea = dimSize;
+			let hudscale = statusbar.GetHudScale();
+			for (int i = 0; i < 4; i++)
+			{
+				markerTransform.Clear();
+				markerTransform.Scale(hudscale * 15);
+				markerTransform.Rotate(90 * i);
+				switch (i)
+				{
+				default:
+					markerTransform.Translate(markerPos);
+					break;
+				case 1:
+					markerTransform.Translate((markerPos.x + markerArea.x, markerPos.y));
+					break;
+				case 2:
+					markerTransform.Translate((markerPos.x + markerArea.x, markerPos.y + markerArea.y));
+					break;
+				case 3:
+					markerTransform.Translate((markerPos.x, markerPos.y + markerArea.y));
+					break;
+				}
+				textBoxMarker.SetTransform(markerTransform);
+				Screen.DrawShapeFill(0x0000cc, 1.0, textBoxMarker);
+			}
 		}
 	}
 
@@ -388,13 +485,13 @@ class TOD_Handler : EventHandler
 		Vector2 vSize = (resolution.x, 30);
 		Vector2 pos1, pos2, size;
 		[pos1, size] = Screen.VirtualToRealCoords((0,0), vSize, resolution, handleaspect:false);
-		pos2 = Screen.VirtualToRealCoords((0, resolution.y - vSize.y), vSize, resolution, handleaspect:false);
+		//pos2 = Screen.VirtualToRealCoords((0, resolution.y - vSize.y), vSize, resolution, handleaspect:false);
 		
 		Screen.Dim(0x000000, 0.8, pos1.x, pos1.y, size.x, size.y);
-		Screen.Dim(0x000000, 0.8, pos2.x, pos2.y, size.x, size.y);
+		//Screen.Dim(0x000000, 0.8, pos2.x, pos2.y, size.x, size.y);
 
 		double alpha = 0.5 + 0.5 * sin(360.0 * level.time / TICRATE);
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < 2; i++)
 		{
 			double xofs = (i < 2)? headerStringOffset : -headerStringOffset;
 			Screen.DrawText(headerFont, 
@@ -457,6 +554,11 @@ class TOD_Handler : EventHandler
 		{
 			DrawTextBox(currentTextBox, resolution, e.fractic, true);
 		}
+	}
+
+	override void WorldLoaded(WorldEvent e)
+	{
+		ToggleTyping(false);
 	}
 
 	override void WorldThingSpawned(WorldEvent e)

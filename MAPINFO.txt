@@ -2,4 +2,6 @@ GameInfo
 {
 	AddEventHandlers = "TOD_Handler", "TOD_StaticInfo"
 	PlayerClasses = "TOD_Player"
+	StatusBarClass = "TOD_Hud"
+	//AltHUDClass = "TOD_AltHud"
 }

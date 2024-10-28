@@ -177,6 +177,16 @@ class TOD_Hud : BaseStatusBar
 			flags,
 			Font.CR_Gold,
 			scale: (0.5, 0.5));
+		if (displayStar && starTics >= STARTIME*0.5)
+		{
+			DrawString(hBigUpper, 
+				String.Format("PERFECT %02d", handler.perfectLevels),
+				pos + (0, size.y + 2),
+				flags,
+				Font.CR_White,
+				scale: (0.5, 0.5),
+				alpha: TOD_Utils.LinearMap(starTics, STARTIME*0.5, STARTIME, 0, 1));
+		}
 		
 		if (displayStar)
 		{

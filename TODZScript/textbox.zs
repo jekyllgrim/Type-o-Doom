@@ -74,29 +74,33 @@ class TOD_TextBox : Thinker
 			return false;
 		}
 
-		int maxiterations = listToUse.Size();
-		while (maxiterations)
+		if (!stringToType)
 		{
 			stringToType = listToUse[random[pickstr](0, listToUse.Size()-1)];
 			firstCharacter = stringToType.Left(1);
-			if (handler.activeTextBoxes.Size() <= 1)
+		}
+		if (handler.activeTextBoxes.Size() > 1)
+		{
+			int maxiterations = listToUse.Size();
+			while (maxiterations)
 			{
-				break;
-			}
-			bool isValid = true;
-			foreach (tbox : handler.activeTextBoxes)
-			{
-				if (tbox && tbox.firstCharacter ~== firstCharacter)
+				bool isValid = true;
+				foreach (tbox : handler.activeTextBoxes)
 				{
-					isValid = false;
+					if (tbox && tbox != self && tbox.firstCharacter ~== firstCharacter)
+					{
+						isValid = false;
+						break;
+					}
+				}
+				if (isValid)
+				{
 					break;
 				}
+				stringToType = listToUse[random[pickstr](0, listToUse.Size()-1)];
+				firstCharacter = stringToType.Left(1);
+				maxiterations--;
 			}
-			if (isValid)
-			{
-				break;
-			}
-			maxiterations--;
 		}
 
 		stringToTypeLength = stringToType.Length();
@@ -126,6 +130,10 @@ class TOD_TextBox : Thinker
 		msg.sMissile = subject.FindState("Missile");
 		msg.PickString();
 		handler.allTextBoxes.Push(msg);
+		if (subject.bDormant)
+		{
+			msg.Deactivate();
+		}
 		return msg;
 	}
 
@@ -190,11 +198,13 @@ class TOD_TextBox : Thinker
 	{
 		if (active && turntics)
 		{
+			//Console.Printf("\cd%s\c- : visible (active, turning)", stringToType);
 			return true;
 		}
 
 		if (ppawn.Distance3DSquared(subject) > TOD_MAXTYPINGRANGE**2)
 		{
+			//Console.Printf("\cd%s\c- : invisible (too far)", stringToType);
 			return false;
 		}
 
@@ -211,24 +221,31 @@ class TOD_TextBox : Thinker
 
 		if (!projection.IsInScreen())
 		{
+			//Console.Printf("\cd%s\c- : invisible (not on screen)", stringToType);
 			return false;
 		}
 
-		return ppawn.CheckSight(subject, SF_IGNOREWATERBOUNDARY);
+		bool sight = ppawn.CheckSight(subject, SF_IGNOREWATERBOUNDARY);
+		//Console.Printf("\cd%s\c- : check sight %s", stringToType, sight? "success" : "fail");
+		return sight;
 	}
 
 	virtual void UpdateVisibility()
 	{
 		age++;
 		int freq = clamp(handler.activeTextBoxes.Size() * 2, 1, 20);
-		if (age % freq == 0 || (!turntics && !active))
+		if (age % freq == 0)// || (!turntics && !active))
 		{
-			if (active && !IsVisible())
+			bool visible = IsVisible();
+			bool isActive = active;
+			if (isActive && !visible)
 			{
+				//Console.Printf("Deactivating \cd%s\c-", stringToType);
 				Deactivate();
 			}
-			else if (!active && IsVisible())
+			if (!isActive && visible)
 			{
+				//Console.Printf("Activating \cd%s\c-", stringToType);
 				Activate();
 			}
 		}
@@ -238,16 +255,23 @@ class TOD_TextBox : Thinker
 	{
 		if (!handler.isPlayerTyping && (Actor.InStateSequence(subject.curstate, sMelee) || Actor.InStateSequence(subject.curstate, sMissile)))
 		{
-			Activate();
-			//EventHandler.SendInterfaceEvent(playerNumber, "TOD_FocusTextBox", id);
-			handler.ToggleTyping(true);
-			Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
-			if (abs(view.x) > 45 || abs(view.y) > 15)
+			if (subject.Distance3D(ppawn) <= TOD_MAXTYPINGRANGE && ppawn.CheckSight(subject, SF_IGNOREWATERBOUNDARY))
 			{
-				double maxViewDist = max(abs(view.x), abs(view.y));
-				turnTics = int(round(TOD_Utils.LinearMap(maxViewDist, 45, 180, TICRATE*0.5, TICRATE)));
-				angleTurnStep = -view.x / turnTics;
-				pitchTurnStep = -view.y / turnTics;
+				Activate();
+				//EventHandler.SendInterfaceEvent(playerNumber, "TOD_FocusTextBox", id);
+				handler.ToggleTyping(true);
+				Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.5), (ppawn.angle, ppawn.pitch));
+				if (abs(view.x) > 45 || abs(view.y) > 15)
+				{
+					double maxViewDist = max(abs(view.x), abs(view.y));
+					turnTics = int(round(TOD_Utils.LinearMap(maxViewDist, 45, 180, TICRATE*0.5, TICRATE)));
+					angleTurnStep = -view.x / turnTics;
+					pitchTurnStep = -view.y / turnTics;
+				}
+			}
+			else
+			{
+				subject.SetState(subject.seestate);
 			}
 		}
 	}
@@ -283,6 +307,11 @@ class TOD_TextBox : Thinker
 		if (!ppawn || !subject || subject.health <= 0)
 		{
 			Destroy();
+			return;
+		}
+
+		if (subject.bDormant)
+		{
 			return;
 		}
 

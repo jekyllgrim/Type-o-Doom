@@ -12,8 +12,8 @@ class TOD_Handler : EventHandler
 	uint perfectLevels;
 	enum EPerfection
 	{
-		PERFECT_WordsPerLevel = 10,
-		PERFECT_LevelsForLife = 5,
+		PERFECT_WordsPerLevel = 8,
+		PERFECT_LevelsForLife = 3,
 	}
 
 	ui TOD_TextBox currentTextBox;
@@ -568,19 +568,33 @@ class TOD_Handler : EventHandler
 			TOD_TextBox.Attach(players[0].mo, e.thing);
 		}
 
-		if (e.thing.bMissile && (!e.thing.target || (e.thing.target.bIsMonster && !e.thing.target.bFriendly)))
+		else if (e.thing.bMissile && (!e.thing.target || !e.thing.target.player))
 		{
 			TOD_ProjectileTextBox.Attach(players[0].mo, e.thing);
 		}
 
-		if (e.thing is 'Blood' || e.thing.bIsPuff || e.thing is 'BulletPuff')
+		else if (e.thing is 'Blood' || e.thing.bIsPuff || e.thing is 'BulletPuff')
 		{
 			e.thing.bNoTimeFreeze = true;
 		}
 
-		if (e.thing is 'Health')
+		else if (e.thing is 'Health')
 		{
 			e.thing.Destroy();
+		}
+
+		else if (e.thing.bIsPuff && e.thing.DamageSource)
+		{
+			let proj = e.thing.DamageSource.A_SpawnProjectile('TOD_HitscanProjectile');
+			e.thing.Destroy();
+		}
+	}
+
+	override void WorldThingRevived(WorldEvent e)
+	{
+		if (e.thing.bIsMonster && !e.thing.bFriendly && e.thing.bShootable)
+		{
+			TOD_TextBox.Attach(players[0].mo, e.thing);
 		}
 	}
 
@@ -606,4 +620,30 @@ class TOD_Handler : EventHandler
 		'WolfensteinSS',           // Wolfenstein soldier
 		'ZombieMan'
 	};
+}
+
+class TOD_HitscanProjectile : Actor
+{
+	Default
+	{
+		Projectile;
+		Speed 20;
+		Renderstyle 'Stencil';
+		Stencilcolor "FFAA00";
+		+BRIGHT
+		+NOTIMEFREEZE
+		Scale 0.25;
+		DamageFunction 1;
+		Radius 4;
+		Height 4;
+	}
+
+	States {
+	Spawn:
+		AMRK A -1;
+		stop;
+	Death:
+		TNT1 A 1;
+		stop;
+	}
 }

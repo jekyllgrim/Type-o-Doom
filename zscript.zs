@@ -12,4 +12,4 @@ version "4.13.0"
 #include "TODZScript/textbox.zs"
 #include "TODZScript/player.zs"
 
-const TOD_MAXTYPINGRANGE = 800;
+const TOD_MAXTYPINGRANGE = 1200;

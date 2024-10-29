@@ -18,16 +18,11 @@ class TOD_Handler : EventHandler
 
 	ui TOD_TextBox currentTextBox;
 	ui Font typeFont;
-	ui Font headerFont;
 	ui int currentPosition;
 	ui String typedString;
 	ui uint displayCharacterTics;
 	ui String displayCharacter;
 	ui bool imperfect;
-	ui int headerStringOffset;
-	ui int headerStringMax;
-	const HEADERTEXT = "Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive!";
-	ui int headerTextWidth;
 	ui Shape2D textBoxMarker;
 	ui Shape2DTransform markerTransform;
 
@@ -294,11 +289,6 @@ class TOD_Handler : EventHandler
 			}
 		}
 
-		if (isPlayerTyping)
-		{
-			if ((headerStringOffset += 4) > headerStringMax) headerStringOffset = 0;
-		}
-
 		if (isPlayerTyping && currentTextBox && (!currentTextBox.projection || !currentTextBox.projection.IsInScreen()))
 		{
 			currentTextBox = null;
@@ -474,67 +464,11 @@ class TOD_Handler : EventHandler
 		}
 	}
 
-	ui void DrawHeaders(Vector2 res = (640, 480))
-	{
-		Vector2 resolution = res.y * (Screen.GetAspectRatio(), 1);
-
-		if (!headerFont)
-		{
-			headerFont = Font.FindFont('BigUpper');
-		}
-		if (!headerTextWidth)
-		{
-			headerTextWidth = headerFont.StringWidth(HEADERTEXT);
-			headerStringMax = resolution.x / 2;
-		}
-		
-		Vector2 vSize = (resolution.x, 30);
-		Vector2 pos1, pos2, size;
-		[pos1, size] = Screen.VirtualToRealCoords((0,0), vSize, resolution, handleaspect:false);
-		//pos2 = Screen.VirtualToRealCoords((0, resolution.y - vSize.y), vSize, resolution, handleaspect:false);
-		
-		Screen.Dim(0x000000, 0.8, pos1.x, pos1.y, size.x, size.y);
-		//Screen.Dim(0x000000, 0.8, pos2.x, pos2.y, size.x, size.y);
-
-		double alpha = 0.5 + 0.5 * sin(360.0 * level.time / TICRATE);
-		for (int i = 0; i < 2; i++)
-		{
-			double xofs = (i < 2)? headerStringOffset : -headerStringOffset;
-			Screen.DrawText(headerFont, 
-				Font.CR_Orange, 
-				(i == 0 || i == 2)? xofs : xofs - headerTextWidth,
-				(i < 2)? 4 : resolution.y - vSize.y*0.7,
-				HEADERTEXT,
-				DTA_VirtualWidthF, res.x,
-				DTA_VirtualHeightF, res.y);
-			Screen.DrawText(headerFont, 
-				Font.CR_White, 
-				(i == 0 || i == 2)? xofs : xofs - headerTextWidth,
-				(i < 2)? 4 : resolution.y - vSize.y*0.7,
-				HEADERTEXT,
-				DTA_VirtualWidthF, res.x,
-				DTA_VirtualHeightF, res.y,
-				DTA_Alpha, alpha);
-		}
-
-		/*if (typeDelayTics)
-		{
-			double alpha = double(typeDelayTics) / TYPEDELAY;
-			Screen.Dim(0xffffff, alpha, pos1.x, pos1.y, size.x, size.y);
-			Screen.Dim(0xffffff, alpha, pos2.x, pos2.y, size.x, size.y);
-		}*/
-	}
-
 	override void RenderOverlay(RenderEvent e)
 	{
 		if (activeTextBoxes.Size() <= 0) return;
 
 		if (!projection) return;
-
-		if (isPlayerTyping)
-		{
-			DrawHeaders();
-		}
 	
 		Vector2 resolution = 480 * (Screen.GetAspectRatio(), 1);
 

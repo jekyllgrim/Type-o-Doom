@@ -23,6 +23,9 @@ class TOD_Hud : BaseStatusBar
 	const HEALTHTEX_LOOPFRAME = 13;
 	const HEALTHTEX_LASTFRAME = 19;
 
+	double prevMSTime;
+	double deltaTime;
+
 	LinearValueInterpolator perfectIntr;
 	int starTics;
 	Vector2 starPos;
@@ -37,6 +40,23 @@ class TOD_Hud : BaseStatusBar
 	const SHOWCRACKTIME = TICRATE * 2;
 	TextureID crackTexture;
 	Vector2 crackPos;
+
+
+	const HEADERTEXT = "Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive! Type to survive!    ";
+	HUDFont headerFont;
+	double headerStringOffset;
+	double headerTextWidth;
+
+	void UpdateDeltaTime()
+	{
+		if (!prevMSTime)
+			prevMSTime = MSTimeF();
+
+		double ftime = MSTimeF() - prevMSTime;
+		prevMSTime = MSTimeF();
+		double dtime = 1000.0 / TICRATE;
+		deltaTime = (ftime / dtime);
+	}
 
 	override void Init()
 	{
@@ -55,14 +75,29 @@ class TOD_Hud : BaseStatusBar
 		if (!handler)
 		{
 			handler = TOD_Handler(EventHandler.Find('TOD_Handler'));
+			return;
 		}
-		else
+
+		UpdateDeltaTime();
+
+		if (handler.isPlayerTyping)
 		{
-			BeginHUD(1.0, true, 320, 200);
-			DrawPerfectionIndicator();
-			DrawHealth();
-			DrawCrack();
+			if ((headerStringOffset += 2*deltaTime) > headerTextWidth) headerStringOffset = 0;
 		}
+
+		if (displayStar)
+		{
+			starAngle -= 10*deltaTime;
+			starPos.y += 2*deltaTime;
+			starAngle -= 10*deltaTime;;
+			starPos.x = 32 + 25 * sin(360.0 * level.time / 40) * (double(starTics) / STARTIME);
+		}
+
+		BeginHUD(1.0, true, 320, 200);
+		DrawPerfectionIndicator();
+		DrawHealth();
+		DrawCrack();
+		DrawHeaders();
 	}
 
 	override void Tick()
@@ -92,9 +127,6 @@ class TOD_Hud : BaseStatusBar
 
 		if (displayStar)
 		{
-			starAngle -= 10;
-			starPos.y += 2;
-			starPos.x = 32 + 25 * sin(360.0 * level.time / 40) * (double(starTics) / STARTIME);
 			double fac = double(starTics) / STARTIME;
 			starAlpha = 1.0 - fac;
 			starScale =  4 / fac;
@@ -219,6 +251,42 @@ class TOD_Hud : BaseStatusBar
 			alpha = (level.time & 8)? 0.25 : 1.0;
 		}
 		DrawTexture(crackTexture, crackPos, DI_ITEM_CENTER, scale: (0.4, 0.4), alpha: alpha);
+	}
+
+	void DrawHeaders()
+	{
+		if (!handler.isPlayerTyping) return;
+
+		double width = horizontalResolution * Screen.GetAspectRatio();
+		double fontscale = 0.5;
+		if (!headerFont)
+		{
+			headerFont = HUDFont.Create(Font.FindFont('BigFont'));
+			headerTextWidth = headerFont.mFont.StringWidth(HEADERTEXT) * fontscale;
+		}
+		
+		Fill(0x80000000, 0, 0, width, 14, DI_SCREEN_LEFT_TOP);
+		Vector2 strPos = (0, 4);
+		double alpha = 1.0;
+		for (int i = 0; i < 4; i++)
+		{
+			if (i >= 2)
+			{
+				alpha = 0.5 + 0.5 * sin(360.0 * level.time / TICRATE);
+			}
+			strPos.x = -headerStringOffset;
+			if (i == 1 || i == 3)
+			{
+				strPos.x += headerTextWidth;
+			}
+			DrawString(headerfont,
+				HEADERTEXT,
+				strPos,
+				DI_SCREEN_LEFT_TOP,
+				(i < 2)? Font.CR_Orange : Font.CR_White,
+				scale: (fontscale, fontscale),
+				alpha: alpha);
+		}
 	}
 }
 

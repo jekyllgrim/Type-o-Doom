@@ -298,6 +298,12 @@ class TOD_Handler : EventHandler
 		{
 			if ((headerStringOffset += 4) > headerStringMax) headerStringOffset = 0;
 		}
+
+		if (isPlayerTyping && currentTextBox && (!currentTextBox.projection || !currentTextBox.projection.IsInScreen()))
+		{
+			currentTextBox = null;
+			typedString = "";
+		}
 	}
 
 	override void WorldTick()
@@ -544,7 +550,7 @@ class TOD_Handler : EventHandler
 
 		foreach (tbox : activeTextBoxes)
 		{
-			if (tbox != currentTextBox)
+			if (tbox && tbox != currentTextBox)
 			{
 				DrawTextBox(tbox, resolution, e.fractic, false);
 			}

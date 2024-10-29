@@ -1,7 +1,7 @@
 class TOD_TextBox : Thinker
 {
 	protected int age;
-	protected TOD_Le_GlScreen projection;
+	TOD_Le_GlScreen projection;
 
 	TOD_Handler handler;
 	PlayerPawn ppawn;

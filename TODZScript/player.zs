@@ -5,13 +5,30 @@ class TOD_Player : DoomPlayer
 	Default
 	{
 		Health 5;
-		MaxHealth 8;
+		Player.MaxHealth 8;
 		+NOTIMEFREEZE
 	}
 
 	override bool CanReceive(Inventory item)
 	{
-		return !(item && item is 'Health');
+		if (!item) return false;
+
+		if (item is 'Health')
+		{
+			item.bPickupGood = true;
+			return false;
+		}
+
+		if (item is 'Armor' &&
+			item.GetClass() != 'Armor' &&
+			item.GetClass() != 'BasicArmor' &&
+			item.GetClass() != 'HexenArmor')
+		{
+			item.bPickupGood = true;
+			return false;
+		}
+
+		return true;
 	}
 
 	override int DamageMobj (Actor inflictor, Actor source, int damage, Name mod, int flags, double angle)
@@ -59,9 +76,9 @@ class TOD_Player : DoomPlayer
 			damageTics--;
 		}
 
-		if (player.readyweapon)
-		{
-			RemoveInventory(player.readyweapon);
-		}
+		//if (player.readyweapon)
+		//{
+		//	RemoveInventory(player.readyweapon);
+		//}
 	}
 }

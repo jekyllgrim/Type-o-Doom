@@ -5,6 +5,7 @@ class TOD_Player : DoomPlayer
 	Default
 	{
 		Health 5;
+		MaxHealth 8;
 		+NOTIMEFREEZE
 	}
 
@@ -56,6 +57,11 @@ class TOD_Player : DoomPlayer
 		if (damageTics && player && player.mo && player.mo == self)
 		{
 			damageTics--;
+		}
+
+		if (player.readyweapon)
+		{
+			RemoveInventory(player.readyweapon);
 		}
 	}
 }

@@ -217,11 +217,18 @@ class TOD_TextBox : Thinker
 		projection.CacheFov(ppawn.player.fov);
 		projection.OrientForPlayer(ppawn.player);
 		projection.BeginProjection();
-		projection.ProjectActorPosPortal(subject, (0, 0, subject.height*0.5));
+		projection.ProjectActorPosPortal(subject, (0, 0, subject.height*0.15));
 
 		if (!projection.IsInScreen())
 		{
 			//Console.Printf("\cd%s\c- : invisible (not on screen)", stringToType);
+			return false;
+		}
+		
+		Vector3 view = level.SphericalCoords((ppawn.pos.xy, ppawn.player.viewz), subject.pos + (0, 0, subject.height*0.15), (ppawn.angle, ppawn.pitch));
+		//Console.Printf("angles: %.1f, %.1f / (%.1f, %.1f)", abs(view.x), abs(view.y), ppawn.player.fov * 0.65, 30);
+		if (abs(view.x) > ppawn.player.fov * 0.65 || abs(view.y) > 30)
+		{
 			return false;
 		}
 

@@ -12,7 +12,7 @@ class TOD_Handler : EventHandler
 	uint perfectLevels;
 	enum EPerfection
 	{
-		PERFECT_WordsPerLevel = 8,
+		PERFECT_WordsPerLevel = 5,
 		PERFECT_LevelsForLife = 3,
 	}
 
@@ -205,8 +205,18 @@ class TOD_Handler : EventHandler
 
 	void ResetPerfectCounter()
 	{
-		perfectWords = 0;
-		perfectLevels = 0;
+		// If the current perfect level counter is above
+		// zero, reset it to zero:
+		if (perfectWords > 0)
+		{
+			perfectWords = 0;
+		}
+		// If it was already zero, reset all levels
+		// to zero:
+		else
+		{
+			perfectLevels = 0;
+		}
 	}
 
 	ui bool TypeCharacter(String chr)
@@ -215,6 +225,11 @@ class TOD_Handler : EventHandler
 
 		chr = TOD_Utils.CleanQuotes(chr);
 		chr = TOD_Utils.CleanDashes(chr);
+
+		if (currentTextBox && !currentTextBox.IsActive())
+		{
+			currentTextBox = null;
+		}
 
 		if (!currentTextBox)
 		{
@@ -289,7 +304,7 @@ class TOD_Handler : EventHandler
 			}
 		}
 
-		if (isPlayerTyping && currentTextBox && (!currentTextBox.projection || !currentTextBox.projection.IsInScreen()))
+		if (isPlayerTyping && currentTextBox && (!currentTextBox.IsActive() || !currentTextBox.projection || !currentTextBox.projection.IsInScreen()))
 		{
 			currentTextBox = null;
 			typedString = "";
@@ -335,7 +350,7 @@ class TOD_Handler : EventHandler
 		if (!isCurrent)
 		{
 			size.y *= 0.5;
-			pos.y += 32;
+			//pos.y += 32;
 		}
 
 		// Screen.Dim doesn't have DTA flags, so we need VirtualToRealCoords

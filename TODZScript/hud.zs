@@ -13,7 +13,7 @@
 	{}
 }*/
 
-class TOD_Hud : BaseStatusBar
+class TOD_Hud : DoomStatusBar
 {
 	TOD_Handler handler;
 	HUDFont hBigUpper;
@@ -60,7 +60,7 @@ class TOD_Hud : BaseStatusBar
 
 	override void Init()
 	{
-		Super.Init();
+		BaseStatusBar.Init();
 		hBigUpper = HUDFont.Create(Font.FindFont('BigUpper'));
 		healthTexFrame = 1;
 		perfectIntr = LinearValueInterpolator.Create(0, 1);
@@ -68,7 +68,7 @@ class TOD_Hud : BaseStatusBar
 
 	override void Draw(int state, double TicFrac)
 	{
-		Super.Draw(state, ticfrac);
+		BaseStatusBar.Draw(state, ticfrac);
 
 		if (state == HUD_None) return;
 
@@ -98,11 +98,12 @@ class TOD_Hud : BaseStatusBar
 		DrawHealth();
 		DrawCrack();
 		DrawHeaders();
+		DrawFullscreenKeys();
 	}
 
 	override void Tick()
 	{
-		Super.Tick();
+		BaseStatusBar.Tick();
 		if (level.time % 2 == 0)
 		{
 			if (++healthTexFrame > HEALTHTEX_LOOPFRAME)

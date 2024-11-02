@@ -33,7 +33,7 @@ class TOD_Handler : EventHandler
 
 	override bool InputProcess (InputEvent e)
 	{
-		if (e.type == InputEvent.Type_KeyDown && !isPlayerTyping)
+		if (e.type == InputEvent.Type_KeyDown && !isPlayerTyping && activeTextBoxes.Size() > 0)
 		{
 			String bind = bindings.GetBinding(e.KeyScan);
 			if (bind ~== "+attack" || bind ~== "+altattack")

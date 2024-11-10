@@ -173,7 +173,7 @@ class TOD_Handler : EventHandler
 		{
 			isPlayerTyping = false;
 			isUiProcessor = false;
-			level.SetFrozen(false);
+			//level.SetFrozen(false);
 			return;
 		}
 
@@ -183,7 +183,7 @@ class TOD_Handler : EventHandler
 			isUiProcessor = true;
 			players[0].mo.A_Stop();
 			players[0].mo.A_AlertMonsters(1024);
-			level.SetFrozen(true);
+			//level.SetFrozen(true);
 			typeDelayTics = TYPEDELAY;
 		}
 	}
@@ -528,10 +528,10 @@ class TOD_Handler : EventHandler
 			TOD_ProjectileTextBox.Attach(players[0].mo, e.thing);
 		}
 
-		else if (e.thing is 'Blood' || e.thing.bIsPuff || e.thing is 'BulletPuff')
+		/*else if (e.thing is 'Blood' || e.thing.bIsPuff || e.thing is 'BulletPuff')
 		{
 			e.thing.bNoTimeFreeze = true;
-		}
+		}*/
 
 		else if (e.thing is 'Health')
 		{
@@ -586,7 +586,7 @@ class TOD_HitscanProjectile : Actor
 		Renderstyle 'Stencil';
 		Stencilcolor "FFAA00";
 		+BRIGHT
-		+NOTIMEFREEZE
+		//+NOTIMEFREEZE
 		Scale 0.25;
 		DamageFunction 1;
 		Radius 4;

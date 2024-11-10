@@ -120,7 +120,7 @@ class TOD_TextBox : Thinker
 		msg.handler = handler;
 		msg.ppawn = ppawn;
 		msg.playerNumber = ppawn.PlayerNumber();
-		subject.bNoTimeFreeze = true;
+		//subject.bNoTimeFreeze = true;
 		subject.bNoInfighting = true;
 		subject.reactiontime = 1;
 		subject.speed *= 0.5;
@@ -161,7 +161,11 @@ class TOD_TextBox : Thinker
 		typeTics = startTypeTime;
 		if (subject)
 		{
-			subject.bNoTimeFreeze = (subject.health <= 0 || !IsAttacking());
+			//subject.bNoTimeFreeze = (subject.health <= 0 || !IsAttacking());
+			if (subject.health <= 0 || !IsAttacking())
+			{
+				subject.freezeTics = 0;
+			}
 		}
 		int id = handler.activeTextBoxes.Find(self);
 		if (id < handler.activeTextBoxes.Size())
@@ -304,8 +308,13 @@ class TOD_TextBox : Thinker
 			}
 			else
 			{
-				subject.bNoTimeFreeze = false;
+				//subject.bNoTimeFreeze = false;
+				subject.freezeTics = TICRATE * 3600;
 			}
+		}
+		else
+		{
+			subject.freezeTics = 0;
 		}
 	}
 
@@ -358,12 +367,14 @@ class TOD_TextBox : Thinker
 	{
 		if (!IsAttacking())
 		{
-			subject.bNoTimeFreeze = true;
+			//subject.bNoTimeFreeze = true;
+			subject.freezeTics = 0;
 			return;
 		}
 		else if (typeTics == startTypeTime)
 		{
 			subject.bNoTimeFreeze = false;
+			subject.freezeTics = typeTics;
 		}
 
 		if (typeTics > 0)
@@ -374,7 +385,8 @@ class TOD_TextBox : Thinker
 				typeTics--;
 				if (typeTics == 0)
 				{
-					subject.bNoTimeFreeze = true;
+					//subject.bNoTimeFreeze = true;
+					subject.freezeTics = 0;
 					typeTics = GetStateSeqDuration(subject.curstate) * -1;
 				}
 			}
@@ -384,8 +396,9 @@ class TOD_TextBox : Thinker
 			typeTics++;
 			if (typeTics == 0)
 			{
-				subject.bNoTimeFreeze = false;
+				//subject.bNoTimeFreeze = false;
 				typeTics = int(round(startTypeTime * 0.7));
+				subject.freezeTics = typeTics;
 				if ((sMelee && subjectCachedState == sMelee) || (sMissile && subjectCachedState == sMissile))
 				{
 					subject.SetState(subjectCachedState);
@@ -404,7 +417,7 @@ class TOD_TextBox : Thinker
 		}
 		if (subject)
 		{
-			subject.bNoTimeFreeze = true;
+			//subject.bNoTimeFreeze = true;
 			if (subject.health > 0)
 				subject.DamageMobj(ppawn, ppawn, subject.health, 'Normal');
 		}
@@ -429,7 +442,7 @@ class TOD_ProjectileTextBox : TOD_TextBox
 		msg.handler = handler;
 		msg.ppawn = ppawn;
 		msg.playerNumber = ppawn.PlayerNumber();
-		subject.bNoTimeFreeze = true;
+		//subject.bNoTimeFreeze = true;
 		subject.vel *= TOD_Utils.LinearMap(handler.activeTextBoxes.Size(), 1, 30, 0.2, 0.02, true);
 		msg.subject = subject;
 		handler.allTextBoxes.Push(msg);
@@ -482,7 +495,7 @@ class TOD_ProjectileTextBox : TOD_TextBox
 		if (subject)
 		{
 			subject.ExplodeMissile();
-			subject.bNoTimeFreeze = true;
+			//subject.bNoTimeFreeze = true;
 		}
 		Destroy();
 	}

@@ -35,7 +35,7 @@ class TOD_Player : DoomPlayer
 	{
 		if (damageTics) return 0;
 		
-		if (mod == 'hitscan' || (inflictor && inflictor.bIsPuff))
+		/*if (mod == 'hitscan' || (inflictor && inflictor.bIsPuff))
 		{
 			if (inflictor.bIsPuff && inflictor.DamageSource)
 			{
@@ -44,7 +44,7 @@ class TOD_Player : DoomPlayer
 			}
 			bNoBlood = true;
 			return 0;
-		}
+		}*/
 
 		let dmgsource = inflictor? inflictor : source;
 		if (!inflictor && !source) return 0;

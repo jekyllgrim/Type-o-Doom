@@ -1,5 +1,6 @@
 class TOD_Handler : EventHandler
 {
+	array<Actor> monstersFiredThisTic;
 	array<TOD_TextBox> allTextBoxes;
 	array<TOD_TextBox> activeTextBoxes;
 	TOD_Le_GlScreen projection;
@@ -29,6 +30,22 @@ class TOD_Handler : EventHandler
 	override void OnRegister()
 	{
 		projection = New("TOD_Le_GlScreen");
+	}
+
+	override bool WorldHitscanPreFired(WorldEvent e)
+	{
+		if (e.thing.player) return false;
+
+		if (monstersFiredThisTic.Find(e.thing) != monstersFiredThisTic.Size())
+		{
+			return true;
+		}
+		else
+		{
+			monstersFiredThisTic.Push(e.thing);
+			let proj = e.thing.A_SpawnProjectile('TOD_HitscanProjectile');
+		}
+		return true;
 	}
 
 	override bool InputProcess (InputEvent e)
@@ -322,6 +339,8 @@ class TOD_Handler : EventHandler
 			typeDelayTics--;
 		}
 
+		monstersFiredThisTic.Clear();
+
 		//Console.MidPrint(smallfont, String.Format("active textboxes: \cd%d\c-", activeTextBoxes.Size()));
 	}
 
@@ -537,12 +556,6 @@ class TOD_Handler : EventHandler
 		{
 			e.thing.Destroy();
 		}
-
-		else if (e.thing.bIsPuff && e.thing.DamageSource)
-		{
-			let proj = e.thing.DamageSource.A_SpawnProjectile('TOD_HitscanProjectile');
-			e.thing.Destroy();
-		}
 	}
 
 	override void WorldThingRevived(WorldEvent e)
@@ -582,7 +595,7 @@ class TOD_HitscanProjectile : Actor
 	Default
 	{
 		Projectile;
-		Speed 20;
+		Speed 10;
 		Renderstyle 'Stencil';
 		Stencilcolor "FFAA00";
 		+BRIGHT

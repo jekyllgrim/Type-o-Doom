@@ -443,7 +443,14 @@ class TOD_ProjectileTextBox : TOD_TextBox
 		msg.ppawn = ppawn;
 		msg.playerNumber = ppawn.PlayerNumber();
 		//subject.bNoTimeFreeze = true;
-		subject.vel *= TOD_Utils.LinearMap(handler.activeTextBoxes.Size(), 1, 30, 0.2, 0.02, true);
+		Actor shooter = subject.target;
+		Actor victim = subject.target.target;
+		if (shooter && victim)
+		{
+			let dist = shooter.Distance3D(victim);
+			subject.vel = subject.vel.Unit() * clamp(dist / TICRATE, 5, 20);
+			subject.vel *= TOD_Utils.LinearMap(handler.activeTextBoxes.Size(), 1, 30, 0.5, 0.05, true);
+		}
 		msg.subject = subject;
 		handler.allTextBoxes.Push(msg);
 		msg.Activate();
@@ -454,7 +461,7 @@ class TOD_ProjectileTextBox : TOD_TextBox
 	{
 		if (stringToType && handler.activeTextBoxes.Find(self) < handler.activeTextBoxes.Size()) return true;
 
-		stringToType = ""..random[pickstring](0, 9);
+		stringToType = ""..random[pickstring](1, 99);
 		
 		firstCharacter = stringToType.Left(1);
 		stringToTypeLength = stringToType.Length();

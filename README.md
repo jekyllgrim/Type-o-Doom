@@ -26,4 +26,10 @@ Planned features:
 
 * More stats.
 
+## Credits
 
+* Agent_Ash (aka Jekyll Grim Payne): concept, main code
+
+* KeksDose: LibEye
+
+* SEGA: The Typing of the Dead / The House of the Dead sounds
